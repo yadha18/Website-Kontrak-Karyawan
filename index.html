@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HRIS · Manajemen Jabatan Karyawan</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">HRIS <span>/ Jabatan Karyawan</span></div>
+  <div class="topbar-sep"></div>
+  <span class="badge-count" id="changesBadge">0 perubahan</span>
+</div>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="nav-label">Menu</div>
+    <button class="nav-item active" onclick="navigate('dashboard')"><span class="icon">📊</span> Dashboard</button>
+    <button class="nav-item" onclick="navigate('upload')"><span class="icon">📂</span> Upload Data</button>
+    <button class="nav-item" onclick="navigate('karyawan')"><span class="icon">👥</span> Data Karyawan</button>
+    <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button>
+    <div class="nav-label">Pengaturan</div>
+    <button class="nav-item" onclick="navigate('jabatan')"><span class="icon">📋</span> Daftar Jabatan</button>
+  </nav>
+
+  <main class="content">
+
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <p>Ringkasan data karyawan, status, dan perubahan historis.</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Karyawan</div><div class="stat-value accent" id="stat-total">0</div></div>
+        <div class="stat-card"><div class="stat-label">🟢 Karyawan Baru</div><div class="stat-value success" id="stat-baru">0</div></div>
+        <div class="stat-card"><div class="stat-label">🔵 Aktif</div><div class="stat-value accent" id="stat-aktif">0</div></div>
+        <div class="stat-card"><div class="stat-label">🔴 Resign</div><div class="stat-value danger" id="stat-resign">0</div></div>
+        <div class="stat-card"><div class="stat-label">Data Diubah</div><div class="stat-value warning" id="stat-changed">0</div></div>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:1fr;margin-top:-8px">
+        <div class="stat-card"><div class="stat-label">Total Jabatan Tersedia</div><div class="stat-value" id="stat-types">0</div></div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between" style="align-items: center; margin-bottom: 16px;">
+          <div class="card-title" style="margin: 0;">🔄 Review Log Perubahan</div>
+          <input type="text" id="searchLog" placeholder="🔍 Cari log (NIP, Nama, Tipe)..." class="form-control" style="max-width: 250px;" oninput="renderDashboard()">
+        </div>
+        <div id="dash-changes">
+          <div class="empty"><div class="empty-icon">📋</div><h3>Belum ada perubahan</h3><p>Log akan muncul saat ada perubahan data karyawan.</p></div>
+        </div>
+      </div>
+      <div class="flex-end">
+        <button class="btn btn-success" onclick="exportExcel()">⬇ Export Excel Terbaru</button>
+      </div>
+    </div>
+
+    <div class="page" id="page-upload">
+      <div class="page-header">
+        <h1>Upload Data Karyawan</h1>
+        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📂 Pilih File Excel</div>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+          <div class="upload-icon">📊</div>
+          <h3>Klik untuk pilih file atau seret ke sini</h3>
+          <p>Format: .xlsx atau .xls · Maks 10 MB</p>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)">
+      </div>
+      <div class="card" id="previewCard" style="display:none">
+        <div class="flex-between">
+          <div class="card-title" style="margin:0">👁 Preview Data</div>
+          <div class="flex-end">
+            <button class="btn btn-secondary" onclick="batalUpload()">✕ Batal</button>
+            <button class="btn btn-primary" onclick="confirmUpload()">✔ Konfirmasi & Simpan</button>
+          </div>
+        </div>
+        <br>
+        <div class="table-wrap">
+          <table><thead><tr id="previewHead"></tr></thead><tbody id="previewBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-karyawan">
+      <div class="page-header">
+        <div class="flex-between">
+          <div>
+            <h1>Data Karyawan</h1>
+            <p>Semua data detail karyawan. Anda dapat mengedit seluruh data & status secara manual.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openModalEdit(null)">➕ Tambah Karyawan Manual</button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchKaryawan" placeholder="🔍  Cari NIP, Nama, SBU..." oninput="resetPageAndRender()">
+        <select id="filterJabatan" onchange="resetPageAndRender()"><option value="">Semua Jabatan</option></select>
+        <select id="filterSBU" onchange="resetPageAndRender()"><option value="">Semua SBU</option></select>
+        <select id="filterStatus"  onchange="resetPageAndRender()">
+          <option value="">Semua Status</option>
+          <option value="Baru Masuk">Baru Masuk</option>
+          <option value="Aktif">Aktif</option>
+          <option value="Resign">Resign</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>Jabatan</th><th>SBU</th><th>BKO Jabatan</th><th>BKO SBU</th><th>Slot BOQ</th><th>Slot Real</th><th>NIP Baru</th><th>Email</th><th>Tgl Update</th><th>Status</th></tr>
+          </thead>
+          <tbody id="karyawanBody"></tbody>
+        </table>
+      </div>
+      
+      <div class="pagination-container" id="paginationKaryawan" style="display: none;">
+        <div class="page-info">
+          Menampilkan
+          <select id="pageSize" onchange="changePageSize()">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          data per halaman. Total: <span id="totalData" style="font-weight:600;color:var(--text)">0</span> data.
+        </div>
+        <div class="page-controls" id="pageControls">
+          </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-pindah">
+      <div class="page-header">
+        <h1>Pindah Jabatan</h1>
+        <p>Cari karyawan dan ubah jabatan secara spesifik dan cepat.</p>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchPindah" placeholder="🔍  Cari NIP atau Nama..." oninput="renderPindah()">
+        <select id="filterPindahJabatan" onchange="renderPindah()"><option value="">Semua Jabatan</option></select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>NIP</th><th>Nama</th><th>Jabatan</th><th>SBU</th><th>Slot Real</th><th>Tgl Update</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="pindahBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="page" id="page-jabatan">
+      <div class="page-header">
+        <h1>Daftar Jabatan</h1>
+        <p>Kelola daftar jabatan karyawan untuk *dropdown* pilihan.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">➕ Tambah Jabatan</div>
+        <div class="form-row" style="grid-template-columns: 1fr;">
+          <div class="form-group">
+            <label class="form-label">Nama Jabatan</label>
+            <input type="text" class="form-control" id="inputJabatanNama" placeholder="cth: MANAGER IT...">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="tambahJabatan()">Simpan Jabatan</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Daftar Jabatan Default</div>
+        <div id="jabatanListDiv"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalEditData">
+  <div class="modal" style="width: 700px;">
+    <div class="modal-header">
+      <h2>✏️ Form Edit Karyawan</h2>
+      <button class="modal-close" onclick="closeModal('modalEditData')">✕</button>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">NIP</label>
+        <input type="text" class="form-control" id="editNIP" placeholder="ex: 123456789ICN">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nama</label>
+        <input type="text" class="form-control" id="editNama">
+      </div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Jabatan</label>
+        <select class="form-control" id="editJabatan">
+          </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">SBU</label>
+        <select class="form-control" id="editSBU">
+          </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">BKO Jabatan</label>
+        <input type="text" class="form-control" id="editBKOJabatan">
+      </div>
+      <div class="form-group">
+        <label class="form-label">BKO SBU</label>
+        <input type="text" class="form-control" id="editBKOSBU">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Slot BOQ</label>
+        <input type="text" class="form-control" id="editSlotBOQ">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Slot Real</label>
+        <input type="text" class="form-control" id="editSlotReal">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">NIP Baru</label>
+        <input type="text" class="form-control" id="editNIPBaru">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" id="editEmail">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="card-title" style="margin-bottom: 12px;">🏷️ Status Kepegawaian</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Status Saat Ini</label>
+        <select class="form-control" id="editStatus">
+          <option value="Baru Masuk">🟢 Baru Masuk</option>
+          <option value="Aktif">🔵 Aktif</option>
+          <option value="Resign">🔴 Resign</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Catatan Status</label>
+        <input type="text" class="form-control" id="editCatatanStatus" placeholder="cth: Pindah divisi / Resign per...">
+      </div>
+    </div>
+
+    <div class="info-note" style="margin-top: 10px;">
+      ℹ️ <strong>Tanggal Update</strong> otomatis tercatat. Setiap perubahan (Jabatan, SBU, Status) akan dicatat terpisah ke histori.
+    </div>
+
+    <div class="flex-end" style="margin-top: 15px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalEditData')">Batal</button>
+      <button class="btn btn-primary" onclick="simpanEditData()">Simpan Data</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalPindah">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🔄 Pindah Jabatan</h2>
+      <button class="modal-close" onclick="closeModal('modalPindah')">✕</button>
+    </div>
+    <div class="card" style="background:var(--surface2);border-color:var(--border2);margin-bottom:20px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">KARYAWAN</div>
+      <div style="font-size:16px;font-weight:700" id="modalNama">—</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px" id="modalNIK">NIP: —</div>
+      <div style="display:flex;gap:16px;margin-top:12px;font-size:13px">
+        <span>Jabatan Lama: <strong id="modalJabatanLama" style="color:var(--warning)">—</strong></span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Pilih Jabatan Baru</label>
+      <select class="form-control" id="modalJabatanBaru">
+        </select>
+    </div>
+    <div class="flex-end" style="margin-top: 20px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalPindah')">Batal</button>
+      <button class="btn btn-primary" onclick="simpanPindah()">Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
