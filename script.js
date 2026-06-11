@@ -140,9 +140,9 @@ const EmployeeService = {
     if (!emp) return false;
 
     // Track Multi-Changes
-    if (newData.Jabatan && emp.Jabatan !== newData.Jabatan) {
+    if (newData.Jabatan && emp.Jabatan !== newData.Jabatan.toUpperCase()) {
       AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'jabatan', emp.Jabatan, newData.Jabatan));
-      emp.Jabatan = newData.Jabatan;
+      emp.Jabatan = newData.Jabatan.toUpperCase();
     }
     if (newData.SBU !== undefined && emp.SBU !== newData.SBU.toUpperCase()) {
       AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'sbu', emp.SBU, newData.SBU.toUpperCase()));
