@@ -21,6 +21,19 @@ const CONFIG = {
     'SULAWESI & INDONESIA TIMUR', 'KALIMANTAN', 'JAWA BAGIAN TIMUR',
     'JAWA BAGIAN TENGAH', 'JAWA BAGIAN BARAT', 'JAKARTA & BANTEN',
     'BALI & NUSA TENGGARA', 'PUSAT'
+  ],
+  // ✅ BARU: Daftar opsi dropdown BKO Jabatan
+  DEFAULT_BKO_JABATAN: [
+    'ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2', 'COLLECTION SBU',
+    'ACCOUNT MANAGER JUNIOR', 'ACCOUNT MANAGER SENIOR', 'OFFICER MARKETING',
+    'VALIDASI SBU', 'ADMINISTRASI SALES', 'COLLECTION PUSAT', 'DATA ANALYST & DESIGN ENGINEER'
+  ],
+  // ✅ BARU: Daftar opsi dropdown BKO SBU
+  DEFAULT_BKO_SBU: [
+    'SUMATERA BAGIAN UTARA', 'SUMATERA BAGIAN TENGAH', 'SUMATERA BAGIAN SELATAN',
+    'SULAWESI & INDONESIA TIMUR', 'KALIMANTAN', 'JAWA BAGIAN TIMUR',
+    'JAWA BAGIAN TENGAH', 'JAWA BAGIAN BARAT', 'JAKARTA & BANTEN',
+    'BALI & NUSA TENGGARA', 'PUSAT'
   ]
 };
 
@@ -43,16 +56,15 @@ const AppState = {
 
 // ─── 3. DATA MODELS (CONTROLLED STRUCTURE) ──────────────────────────────────
 const Models = {
-  // Memastikan struktur data karyawan selalu seragam
   Karyawan(data = {}) {
     return {
       id:            data.id || Date.now() + Math.random(),
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
-      Jabatan:       String(data.Jabatan || '').trim(),
+      Jabatan:       String(data.Jabatan || '').trim().toUpperCase(),
       SBU:           String(data.SBU || '').trim().toUpperCase(),
-      BKOJabatan:    String(data.BKOJabatan || '').trim(),
-      BKOSBU:        String(data.BKOSBU || '').trim(),
+      BKOJabatan:    String(data.BKOJabatan || '').trim().toUpperCase(), // ✅ force uppercase
+      BKOSBU:        String(data.BKOSBU || '').trim().toUpperCase(),     // ✅ force uppercase
       SlotBOQ:       String(data.SlotBOQ || '').trim(),
       SlotReal:      String(data.SlotReal || '').trim(),
       NIPBaru:       String(data.NIPBaru || '').trim(),
@@ -64,7 +76,6 @@ const Models = {
     };
   },
 
-  // Memastikan log histori seragam
   LogChange(nik, nama, type, oldVal, newVal, catatan = '') {
     return {
       id: Date.now() + Math.random(),
@@ -98,7 +109,7 @@ const Utils = {
     const el = document.getElementById(id);
     if (!el) return;
     const cur = el.value;
-    el.innerHTML = '<option value="">Semua</option>'; // Default empty
+    el.innerHTML = '<option value="">Semua</option>';
     options.forEach(o => { 
       const opt = document.createElement('option'); 
       opt.value = o; opt.textContent = o; 
@@ -139,9 +150,8 @@ const EmployeeService = {
     const emp = AppState.karyawan.find(k => k.id === id);
     if (!emp) return false;
 
-    // Track Multi-Changes
     if (newData.Jabatan && emp.Jabatan !== newData.Jabatan.toUpperCase()) {
-      AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'jabatan', emp.Jabatan, newData.Jabatan));
+      AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'jabatan', emp.Jabatan, newData.Jabatan.toUpperCase()));
       emp.Jabatan = newData.Jabatan.toUpperCase();
     }
     if (newData.SBU !== undefined && emp.SBU !== newData.SBU.toUpperCase()) {
@@ -155,9 +165,8 @@ const EmployeeService = {
       emp.StatusManual = true;
     }
 
-    // Update remaining data using Model properties
     Object.assign(emp, Models.Karyawan({ ...emp, ...newData }));
-    emp.TglUpdate = Utils.getTodayDate(); // Force update date
+    emp.TglUpdate = Utils.getTodayDate();
 
     DB.save();
     return true;
@@ -201,7 +210,6 @@ const UI = {
     document.getElementById('stat-changed').textContent= log.length;
     document.getElementById('stat-types').textContent  = jabatan.length;
 
-    // Log Filter
     const qLog = (document.getElementById('searchLog')?.value || '').toLowerCase();
     const filteredLog = log.filter(c => 
       !qLog || c.nik.toLowerCase().includes(qLog) || c.nama.toLowerCase().includes(qLog) || 
@@ -247,7 +255,6 @@ const UI = {
     const fSBU = document.getElementById('filterSBU')?.value || '';
     const fS   = document.getElementById('filterStatus')?.value || '';
 
-    // Update Dropdown Filters Dynamically
     Utils.fillSelect('filterJabatan', [...new Set(karyawan.map(k => k.Jabatan))].filter(Boolean));
     Utils.fillSelect('filterSBU', [...new Set(karyawan.map(k => k.SBU))].filter(Boolean));
 
@@ -267,7 +274,6 @@ const UI = {
       return;
     }
 
-    // Pagination Calculation
     pageContainer.style.display = 'flex';
     document.getElementById('totalData').textContent = filtered.length;
     const totalPages = Math.ceil(filtered.length / pagination.size) || 1;
@@ -359,7 +365,6 @@ const UI = {
 
 // ─── 8. EVENT HANDLERS (EXPOSED TO HTML) ────────────────────────────────────
 const Handlers = {
-  // Navigation & Pagination
   navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -375,7 +380,6 @@ const Handlers = {
   changePageSize() { AppState.pagination.size = parseInt(document.getElementById('pageSize').value); this.resetPageAndRender(); },
   goToPage(p) { AppState.pagination.page = p; UI.renderKaryawanTable(); },
 
-  // Upload Handlers
   handleFile(e) { if (e.target.files[0]) this.processExcel(e.target.files[0]); },
   processExcel(file) {
     const reader = new FileReader();
@@ -397,7 +401,6 @@ const Handlers = {
         return obj;
       }).filter(r => r.NIP || r.Nama);
 
-      // Render Preview
       document.getElementById('previewHead').innerHTML = COLS.map(c => `<th>${c}</th>`).join('');
       document.getElementById('previewBody').innerHTML = AppState.previewUpload.slice(0, 20).map(r => `
         <tr>${COLS.map(c => `<td class="${c === 'NIP' ? 'mono' : ''}">${r[c]}</td>`).join('')}</tr>
@@ -417,59 +420,75 @@ const Handlers = {
   confirmUpload() {
     if (!AppState.previewUpload.length) return Utils.toast('❌ Tidak ada data!');
     EmployeeService.bulkUpload(AppState.previewUpload);
-    this.cancelUpload(); // Reset UI
+    this.cancelUpload();
     Utils.toast(`✅ Karyawan berhasil disimpan`);
     this.resetPageAndRender();
     this.navigate('dashboard');
   },
 
-  // Modal: Edit Karyawan
+  // ✅ DIUBAH: openEditModal — tambah populate dropdown BKO Jabatan & BKO SBU
   openEditModal(id) {
     AppState.modals.editTargetId = id;
     
-    // Fill Dropdowns
-    const elJabatan = document.getElementById('editJabatan');
-    const elSBU = document.getElementById('editSBU');
-    elJabatan.innerHTML = '<option value="">— Pilih Jabatan —</option>' + AppState.jabatan.map(j => `<option value="${j.nama}">${j.nama}</option>`).join('');
-    elSBU.innerHTML = '<option value="">— Pilih SBU —</option>' + CONFIG.DEFAULT_SBU.map(s => `<option value="${s}">${s}</option>`).join('');
+    // Populate semua dropdown
+    const elJabatan    = document.getElementById('editJabatan');
+    const elSBU        = document.getElementById('editSBU');
+    const elBKOJabatan = document.getElementById('editBKOJabatan');
+    const elBKOSBU     = document.getElementById('editBKOSBU');
 
-    const emp = id ? AppState.karyawan.find(k => k.id === id) : Models.Karyawan(); // Empty if null
+    elJabatan.innerHTML = '<option value="">— Pilih Jabatan —</option>' + 
+      AppState.jabatan.map(j => `<option value="${j.nama}">${j.nama}</option>`).join('');
 
-    // Populate Fields
-    document.getElementById('editNIP').value = emp.NIP;
-    document.getElementById('editNama').value = emp.Nama;
-    document.getElementById('editJabatan').value = emp.Jabatan;
-    document.getElementById('editSBU').value = emp.SBU;
-    document.getElementById('editBKOJabatan').value = emp.BKOJabatan;
-    document.getElementById('editBKOSBU').value = emp.BKOSBU;
-    document.getElementById('editSlotBOQ').value = emp.SlotBOQ;
-    document.getElementById('editSlotReal').value = emp.SlotReal;
-    document.getElementById('editNIPBaru').value = emp.NIPBaru;
-    document.getElementById('editEmail').value = emp.Email;
-    document.getElementById('editStatus').value = emp.Status;
-    document.getElementById('editCatatanStatus').value = emp.StatusCatatan;
+    elSBU.innerHTML = '<option value="">— Pilih SBU —</option>' + 
+      CONFIG.DEFAULT_SBU.map(s => `<option value="${s}">${s}</option>`).join('');
+
+    // ✅ BKO Jabatan dropdown
+    elBKOJabatan.innerHTML = '<option value="">— Pilih BKO Jabatan —</option>' + 
+      CONFIG.DEFAULT_BKO_JABATAN.map(b => `<option value="${b}">${b}</option>`).join('');
+
+    // ✅ BKO SBU dropdown
+    elBKOSBU.innerHTML = '<option value="">— Pilih BKO SBU —</option>' + 
+      CONFIG.DEFAULT_BKO_SBU.map(b => `<option value="${b}">${b}</option>`).join('');
+
+    const emp = id ? AppState.karyawan.find(k => k.id === id) : Models.Karyawan();
+
+    // Populate field values
+    document.getElementById('editNIP').value          = emp.NIP;
+    document.getElementById('editNama').value         = emp.Nama;
+    document.getElementById('editJabatan').value      = emp.Jabatan;
+    document.getElementById('editSBU').value          = emp.SBU;
+    document.getElementById('editBKOJabatan').value   = emp.BKOJabatan; // ✅ set value dropdown
+    document.getElementById('editBKOSBU').value       = emp.BKOSBU;     // ✅ set value dropdown
+    document.getElementById('editSlotBOQ').value      = emp.SlotBOQ;
+    document.getElementById('editSlotReal').value     = emp.SlotReal;
+    document.getElementById('editNIPBaru').value      = emp.NIPBaru;
+    document.getElementById('editEmail').value        = emp.Email;
+    document.getElementById('editStatus').value       = emp.Status;
+    document.getElementById('editCatatanStatus').value= emp.StatusCatatan;
 
     document.getElementById('modalEditData').classList.add('open');
   },
+
+  // ✅ DIUBAH: saveEditData — nilai BKO diambil dari select, di-uppercase via Models.Karyawan
   saveEditData() {
-    const NIP = document.getElementById('editNIP').value.trim();
+    const NIP  = document.getElementById('editNIP').value.trim();
     const Nama = document.getElementById('editNama').value.trim();
     if (!NIP || !Nama) return Utils.toast('❌ NIP dan Nama wajib diisi!');
 
     const formData = {
       NIP, Nama,
-      Jabatan: document.getElementById('editJabatan').value,
-      SBU: document.getElementById('editSBU').value,
-      BKOJabatan: document.getElementById('editBKOJabatan').value,
-      BKOSBU: document.getElementById('editBKOSBU').value,
-      SlotBOQ: document.getElementById('editSlotBOQ').value,
-      SlotReal: document.getElementById('editSlotReal').value,
-      NIPBaru: document.getElementById('editNIPBaru').value,
-      Email: document.getElementById('editEmail').value
+      Jabatan:    document.getElementById('editJabatan').value,
+      SBU:        document.getElementById('editSBU').value,
+      BKOJabatan: document.getElementById('editBKOJabatan').value.toUpperCase(), // ✅ uppercase
+      BKOSBU:     document.getElementById('editBKOSBU').value.toUpperCase(),     // ✅ uppercase
+      SlotBOQ:    document.getElementById('editSlotBOQ').value,
+      SlotReal:   document.getElementById('editSlotReal').value,
+      NIPBaru:    document.getElementById('editNIPBaru').value,
+      Email:      document.getElementById('editEmail').value
     };
 
     const statusData = {
-      Status: document.getElementById('editStatus').value,
+      Status:  document.getElementById('editStatus').value,
       Catatan: document.getElementById('editCatatanStatus').value.trim()
     };
 
@@ -487,7 +506,6 @@ const Handlers = {
     UI.updateBadge();
   },
 
-  // Modal: Quick Move Jabatan
   openQuickMoveModal(id) {
     AppState.modals.editTargetId = id;
     const emp = AppState.karyawan.find(x => x.id === id);
@@ -512,7 +530,6 @@ const Handlers = {
     Utils.toast(`✅ Jabatan berhasil diubah`);
   },
 
-  // Jabatan Management
   addJabatan() {
     const nama = document.getElementById('inputJabatanNama').value.trim().toUpperCase();
     if (!nama) return Utils.toast('❌ Nama jabatan wajib diisi!');
@@ -532,7 +549,6 @@ const Handlers = {
     Utils.toast('🗑 Jabatan dihapus');
   },
 
-  // Export
   exportToExcel() {
     if (!AppState.karyawan.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
 
@@ -560,22 +576,21 @@ const Handlers = {
 };
 
 // ─── 9. GLOBAL BINDINGS (Bridges to HTML) ───────────────────────────────────
-// Agar fungsi-fungsi bisa dipanggil langsung dari onclick HTML
-window.navigate = (page) => Handlers.navigate(page);
-window.handleFile = (e) => Handlers.handleFile(e);
-window.batalUpload = () => Handlers.cancelUpload();
-window.confirmUpload = () => Handlers.confirmUpload();
-window.renderDashboard = () => UI.renderDashboard();
-window.resetPageAndRender = () => Handlers.resetPageAndRender();
-window.changePageSize = () => Handlers.changePageSize();
-window.renderPindah = () => UI.renderPindahJabatan();
-window.openModalEdit = (id) => Handlers.openEditModal(id);
-window.simpanEditData = () => Handlers.saveEditData();
-window.closeModal = (id) => UI.closeModal(id);
-window.openModalPindah = (id) => Handlers.openQuickMoveModal(id);
-window.simpanPindah = () => Handlers.saveQuickMove();
-window.tambahJabatan = () => Handlers.addJabatan();
-window.exportExcel = () => Handlers.exportToExcel();
+window.navigate         = (page) => Handlers.navigate(page);
+window.handleFile       = (e)    => Handlers.handleFile(e);
+window.batalUpload      = ()     => Handlers.cancelUpload();
+window.confirmUpload    = ()     => Handlers.confirmUpload();
+window.renderDashboard  = ()     => UI.renderDashboard();
+window.resetPageAndRender = ()   => Handlers.resetPageAndRender();
+window.changePageSize   = ()     => Handlers.changePageSize();
+window.renderPindah     = ()     => UI.renderPindahJabatan();
+window.openModalEdit    = (id)   => Handlers.openEditModal(id);
+window.simpanEditData   = ()     => Handlers.saveEditData();
+window.closeModal       = (id)   => UI.closeModal(id);
+window.openModalPindah  = (id)   => Handlers.openQuickMoveModal(id);
+window.simpanPindah     = ()     => Handlers.saveQuickMove();
+window.tambahJabatan    = ()     => Handlers.addJabatan();
+window.exportExcel      = ()     => Handlers.exportToExcel();
 
 // Initialize application
 UI.init();
