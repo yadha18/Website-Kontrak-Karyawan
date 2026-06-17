@@ -61,7 +61,7 @@ const Models = {
       id:            data.id || Date.now() + Math.random(),
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
-      Jabatan:       String(data.Jabatan || '').trim().toUpperCase(),
+      Jabatan:       String(data.Jabatan || '').trim(),
       SBU:           String(data.SBU || '').trim().toUpperCase(),
       BKOJabatan:    String(data.BKOJabatan || '').trim().toUpperCase(), // ✅ force uppercase
       BKOSBU:        String(data.BKOSBU || '').trim().toUpperCase(),     // ✅ force uppercase
@@ -151,12 +151,20 @@ const EmployeeService = {
     if (!emp) return false;
 
     if (newData.Jabatan && emp.Jabatan !== newData.Jabatan.toUpperCase()) {
-      AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'jabatan', emp.Jabatan, newData.Jabatan.toUpperCase()));
+      AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'jabatan', emp.Jabatan, newData.Jabatan));
       emp.Jabatan = newData.Jabatan.toUpperCase();
     }
     if (newData.SBU !== undefined && emp.SBU !== newData.SBU.toUpperCase()) {
       AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'sbu', emp.SBU, newData.SBU.toUpperCase()));
       emp.SBU = newData.SBU.toUpperCase();
+    }
+    // ✅ BARU: Track perubahan BKO Jabatan
+    if (newData.BKOJabatan !== undefined && emp.BKOJabatan !== newData.BKOJabatan.toUpperCase()) {
+      AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'bko jabatan', emp.BKOJabatan, newData.BKOJabatan.toUpperCase()));
+    }
+    // ✅ BARU: Track perubahan BKO SBU
+    if (newData.BKOSBU !== undefined && emp.BKOSBU !== newData.BKOSBU.toUpperCase()) {
+      AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'bko sbu', emp.BKOSBU, newData.BKOSBU.toUpperCase()));
     }
     if (newStatusData && (emp.Status !== newStatusData.Status || emp.StatusCatatan !== newStatusData.Catatan)) {
       AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'status', emp.Status, newStatusData.Status, newStatusData.Catatan));
@@ -233,7 +241,8 @@ const UI = {
           <tbody>
             ${filteredLog.slice().reverse().map(c => {
               const isStatus = c.type === 'status';
-              const badge = `<span class="pill pill-${isStatus ? 'purple' : (c.type === 'sbu' ? 'blue' : 'yellow')}">${c.type.toUpperCase()}</span>`;
+              const pillColor = isStatus ? 'purple' : c.type === 'sbu' ? 'blue' : c.type === 'bko jabatan' ? 'green' : c.type === 'bko sbu' ? 'purple' : 'yellow';
+              const badge = `<span class="pill pill-${pillColor}">${c.type.toUpperCase()}</span>`;
               const detailHtml = isStatus 
                 ? `${Utils.statusPill(c.oldVal)} → ${Utils.statusPill(c.newVal)}${c.catatan ? `<br><span style="color:var(--text2);font-size:10px">${c.catatan}</span>` : ''}`
                 : `<span class="diff-old">${c.oldVal}</span><br><span class="diff-new">${c.newVal}</span>`;
@@ -269,7 +278,7 @@ const UI = {
     const pageContainer = document.getElementById('paginationKaryawan');
 
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="13"><div class="empty"><div class="empty-icon">👥</div><h3>Tidak ada data</h3></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="14"><div class="empty"><div class="empty-icon">👥</div><h3>Tidak ada data</h3></div></td></tr>`;
       pageContainer.style.display = 'none';
       return;
     }
@@ -284,7 +293,10 @@ const UI = {
 
     tbody.innerHTML = paginated.map(k => `
       <tr>
-        <td><button class="btn btn-secondary btn-sm" onclick="Handlers.openEditModal(${k.id})">✏️ Edit</button></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick="Handlers.openEditModal(${k.id})">✏️ Edit</button>
+          <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="Handlers.deleteKaryawan(${k.id})">🗑 Hapus</button>
+        </td>
         <td class="mono">${k.NIP}</td><td style="font-weight:500">${k.Nama}</td>
         <td><span class="pill pill-blue">${k.Jabatan}</span></td><td>${k.SBU}</td>
         <td>${k.BKOJabatan}</td><td>${k.BKOSBU}</td><td>${k.SlotBOQ}</td><td>${k.SlotReal}</td>
@@ -530,6 +542,39 @@ const Handlers = {
     Utils.toast(`✅ Jabatan berhasil diubah`);
   },
 
+  // ✅ BARU: Hapus karyawan dengan modal konfirmasi kustom
+  deleteKaryawan(id) {
+    const emp = AppState.karyawan.find(k => k.id === id);
+    if (!emp) return;
+
+    // Isi data di modal konfirmasi
+    document.getElementById('confirmDeleteNama').textContent = emp.Nama;
+    document.getElementById('confirmDeleteNIP').textContent  = emp.NIP;
+    document.getElementById('confirmDeleteJabatan').textContent = emp.Jabatan || '—';
+    document.getElementById('confirmDeleteSBU').textContent  = emp.SBU || '—';
+
+    // Simpan id target ke tombol konfirmasi
+    document.getElementById('btnConfirmDelete').setAttribute('data-id', id);
+    document.getElementById('modalConfirmDelete').classList.add('open');
+  },
+
+  confirmDeleteKaryawan() {
+    const id = parseFloat(document.getElementById('btnConfirmDelete').getAttribute('data-id'));
+    const emp = AppState.karyawan.find(k => k.id === id);
+    if (!emp) return;
+
+    const nama = emp.Nama;
+    AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'hapus', nama, '(dihapus)'));
+    AppState.karyawan = AppState.karyawan.filter(k => k.id !== id);
+    DB.save();
+
+    UI.closeModal('modalConfirmDelete');
+    UI.renderKaryawanTable();
+    UI.renderDashboard();
+    UI.updateBadge();
+    Utils.toast(`🗑 Karyawan "${nama}" berhasil dihapus`);
+  },
+
   addJabatan() {
     const nama = document.getElementById('inputJabatanNama').value.trim().toUpperCase();
     if (!nama) return Utils.toast('❌ Nama jabatan wajib diisi!');
@@ -591,6 +636,7 @@ window.openModalPindah  = (id)   => Handlers.openQuickMoveModal(id);
 window.simpanPindah     = ()     => Handlers.saveQuickMove();
 window.tambahJabatan    = ()     => Handlers.addJabatan();
 window.exportExcel      = ()     => Handlers.exportToExcel();
+window.confirmDeleteKaryawan = () => Handlers.confirmDeleteKaryawan(); // ✅ BARU
 
 // Initialize application
 UI.init();

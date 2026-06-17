@@ -292,6 +292,39 @@
   </div>
 </div>
 
+<!-- ✅ BARU: Modal Konfirmasi Hapus Karyawan -->
+<div class="modal-overlay" id="modalConfirmDelete">
+  <div class="modal" style="width: 460px;">
+    <div class="modal-header">
+      <h2>🗑 Konfirmasi Hapus Karyawan</h2>
+      <button class="modal-close" onclick="closeModal('modalConfirmDelete')">✕</button>
+    </div>
+
+    <div class="info-note" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:var(--danger);margin-bottom:20px;">
+      ⚠️ <strong>Tindakan ini tidak dapat dibatalkan.</strong> Data karyawan akan dihapus permanen dari sistem.
+    </div>
+
+    <div class="card" style="background:var(--surface2);border-color:var(--border2);margin-bottom:20px;">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase;">Data yang akan dihapus</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;">
+        <span style="color:var(--text2);">Nama</span>
+        <span style="font-weight:600;" id="confirmDeleteNama">—</span>
+        <span style="color:var(--text2);">NIP</span>
+        <span class="mono" id="confirmDeleteNIP">—</span>
+        <span style="color:var(--text2);">Jabatan</span>
+        <span id="confirmDeleteJabatan">—</span>
+        <span style="color:var(--text2);">SBU</span>
+        <span id="confirmDeleteSBU">—</span>
+      </div>
+    </div>
+
+    <div class="flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modalConfirmDelete')">Batal</button>
+      <button class="btn btn-danger" id="btnConfirmDelete" onclick="confirmDeleteKaryawan()" style="background:var(--danger);color:#fff;">🗑 Ya, Hapus Sekarang</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script src="script.js"></script>
