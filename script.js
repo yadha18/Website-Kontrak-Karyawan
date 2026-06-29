@@ -79,6 +79,48 @@ const CONFIG = {
       canonical: 'BALI & NUSA TENGGARA',
       aliases: ['BNT', 'BALI', 'NTT', 'NUSA TENGGARA TIMUR']
     }
+  ],
+
+  // ✅ BARU: Peta alias Jabatan — exact match terhadap alias, dipetakan ke nama resmi
+  // Berbeda dengan SBU yang pakai contains, Jabatan pakai EXACT MATCH
+  // agar tidak terjadi false-positive (misal "COLLECTION SBU" vs "COLLECTION")
+  JABATAN_ALIAS_MAP: [
+    {
+      canonical: 'VALIDASI SBU',
+      aliases: ['VERIFICATOR']
+    },
+    {
+      canonical: 'DATA ANALYST & DESIGN ENGINEER',
+      aliases: ['DATA ANALYST & INFOGRAFIS ENGINEER']
+    },
+    {
+      canonical: 'OFFICER MARKETING',
+      aliases: ['OFFICER MARKETING RETAIL']
+    },
+    {
+      canonical: 'ACCOUNT EXECUTIVE GRADE 1',
+      aliases: ['ACCOUNT EXECUTIVE RETAIL GRADE 1']
+    },
+    {
+      canonical: 'ACCOUNT EXECUTIVE GRADE 2',
+      aliases: ['ACCOUNT EXECUTIVE RETAIL GRADE 2']
+    },
+    {
+      canonical: 'ACCOUNT MANAGER JUNIOR',
+      aliases: ['ACCOUNT MANAGER JUNIOR RETAIL']
+    },
+    {
+      canonical: 'ACCOUNT MANAGER SENIOR',
+      aliases: ['ACCOUNT MANAGER SENIOR RETAIL']
+    },
+    {
+      canonical: 'COLLECTION PUSAT',
+      aliases: ['COLLECTION']
+    },
+    {
+      canonical: 'COLLECTION SBU',
+      aliases: ['COLLECTION SBU']
+    }
   ]
 };
 
@@ -106,9 +148,9 @@ const Models = {
       id:            data.id || Date.now() + Math.random(),
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
-      Jabatan:       String(data.Jabatan || '').trim(),
+      Jabatan:       Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       SBU:           Utils.resolveSBU(String(data.SBU || '').trim()),
-      BKOJabatan:    String(data.BKOJabatan || '').trim().toUpperCase(),
+      BKOJabatan:    Utils.resolveJabatan(String(data.BKOJabatan || '').trim()),
       BKOSBU:        Utils.resolveSBU(String(data.BKOSBU || '').trim()),
       SlotBOQ:       String(data.SlotBOQ || '').trim(),
       SlotReal:      String(data.SlotReal || '').trim(),
@@ -158,6 +200,30 @@ const Utils = {
       const sortedAliases = [...entry.aliases].sort((a, b) => b.length - a.length);
       for (const alias of sortedAliases) {
         if (upper.includes(alias)) return entry.canonical;
+      }
+    }
+
+    // 3. Tidak cocok — kembalikan nilai asli (uppercase)
+    return upper;
+  },
+
+  // ✅ BARU: Resolve alias Jabatan ke nama resmi (exact match)
+  // Pakai exact match, bukan contains, agar "COLLECTION SBU" tidak
+  // salah terpetakan ke "COLLECTION PUSAT" hanya karena mengandung "COLLECTION".
+  // Alias terpanjang dicek duluan untuk antisipasi overlap di masa depan.
+  resolveJabatan(raw) {
+    if (!raw) return raw;
+    const upper = String(raw).trim().toUpperCase();
+
+    // 1. Exact match ke nama canonical dari DEFAULT_JABATAN — langsung kembalikan
+    const exactCanonical = CONFIG.DEFAULT_JABATAN.find(j => j === upper);
+    if (exactCanonical) return exactCanonical;
+
+    // 2. Cek alias (exact match) — alias terpanjang dicek duluan
+    for (const entry of CONFIG.JABATAN_ALIAS_MAP) {
+      const sortedAliases = [...entry.aliases].sort((a, b) => b.length - a.length);
+      for (const alias of sortedAliases) {
+        if (upper === alias) return entry.canonical;
       }
     }
 
