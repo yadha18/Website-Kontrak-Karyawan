@@ -34,6 +34,51 @@ const CONFIG = {
     'SULAWESI & INDONESIA TIMUR', 'KALIMANTAN', 'JAWA BAGIAN TIMUR',
     'JAWA BAGIAN TENGAH', 'JAWA BAGIAN BARAT', 'JAKARTA & BANTEN',
     'BALI & NUSA TENGGARA', 'PUSAT'
+  ],
+
+  // ✅ BARU: Peta alias SBU — setiap alias (keyword) dipetakan ke nama resmi
+  // Pencocokan dilakukan dengan contains (includes), bukan exact match
+  SBU_ALIAS_MAP: [
+    {
+      canonical: 'SUMATERA BAGIAN UTARA',
+      aliases: ['SBU', 'SUMBAGUT', 'PADANG SIDEMPUAN', 'MEDAN', 'ACEH']
+    },
+    {
+      canonical: 'SUMATERA BAGIAN TENGAH',
+      aliases: ['SBT', 'SUMBAGTENG', 'PEKANBARU', 'PEKAN BARU']
+    },
+    {
+      canonical: 'SUMATERA BAGIAN SELATAN',
+      aliases: ['SBS', 'SUMBAGSEL', 'JAMBI', 'PALEMBANG', 'LAMPUNG', 'BANGKA BELITUNG', 'BELITUNG', 'BENGKULU']
+    },
+    {
+      canonical: 'JAWA BAGIAN BARAT',
+      aliases: ['JBB', 'JABAR', 'JAWA BARAT', 'BANDUNG']
+    },
+    {
+      canonical: 'JAWA BAGIAN TENGAH',
+      aliases: ['JBTG', 'JATENG', 'JAWA TENGAH', 'SEMARANG']
+    },
+    {
+      canonical: 'JAWA BAGIAN TIMUR',
+      aliases: ['JBT', 'JATIM', 'JAWA TIMUR', 'SURABAYA', 'MADIUN']
+    },
+    {
+      canonical: 'JAKARTA & BANTEN',
+      aliases: ['JKB', 'JAKBAN', 'JAKARTA & BANTEN', 'JAKARTA', 'BANTEN']
+    },
+    {
+      canonical: 'KALIMANTAN',
+      aliases: ['BALIKPAPAN', 'PONTIANAK', 'BANJARMASIN', 'KAL', 'KALTIM', 'KALBAR', 'KALTENG', 'KALSEL', 'SAMARINDA']
+    },
+    {
+      canonical: 'SULAWESI & INDONESIA TIMUR',
+      aliases: ['RIT', 'SIBT', 'SIT', 'SULAWESI', 'MAKASSAR', 'NTB', 'NUSA TENGGARA BARAT']
+    },
+    {
+      canonical: 'BALI & NUSA TENGGARA',
+      aliases: ['BNT', 'BALI', 'NTT', 'NUSA TENGGARA TIMUR']
+    }
   ]
 };
 
@@ -62,9 +107,9 @@ const Models = {
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
       Jabatan:       String(data.Jabatan || '').trim(),
-      SBU:           String(data.SBU || '').trim().toUpperCase(),
-      BKOJabatan:    String(data.BKOJabatan || '').trim().toUpperCase(), // ✅ force uppercase
-      BKOSBU:        String(data.BKOSBU || '').trim().toUpperCase(),     // ✅ force uppercase
+      SBU:           Utils.resolveSBU(String(data.SBU || '').trim()),
+      BKOJabatan:    String(data.BKOJabatan || '').trim().toUpperCase(),
+      BKOSBU:        Utils.resolveSBU(String(data.BKOSBU || '').trim()),
       SlotBOQ:       String(data.SlotBOQ || '').trim(),
       SlotReal:      String(data.SlotReal || '').trim(),
       NIPBaru:       String(data.NIPBaru || '').trim(),
@@ -93,6 +138,31 @@ const Utils = {
   getTodayDate() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  },
+
+  // ✅ BARU: Resolve alias SBU ke nama resmi
+  // Cara kerja: jika input PERSIS sama dengan canonical → langsung return.
+  // Jika tidak, cek apakah input MENGANDUNG salah satu alias (keyword).
+  // Alias lebih panjang dicek duluan (sorted by length desc) agar "JAWA BARAT"
+  // tidak salah dipetakan hanya karena mengandung "BARAT".
+  resolveSBU(raw) {
+    if (!raw) return raw;
+    const upper = String(raw).trim().toUpperCase();
+
+    // 1. Exact match ke nama canonical — langsung kembalikan
+    const exactCanonical = CONFIG.DEFAULT_SBU.find(s => s === upper);
+    if (exactCanonical) return exactCanonical;
+
+    // 2. Cek alias — urutkan alias terpanjang dulu supaya lebih spesifik
+    for (const entry of CONFIG.SBU_ALIAS_MAP) {
+      const sortedAliases = [...entry.aliases].sort((a, b) => b.length - a.length);
+      for (const alias of sortedAliases) {
+        if (upper.includes(alias)) return entry.canonical;
+      }
+    }
+
+    // 3. Tidak cocok — kembalikan nilai asli (uppercase)
+    return upper;
   },
   statusPill(status) {
     const s = STATUS_DEF[status] || { pill: 'pill-gray', label: status || '—' };
