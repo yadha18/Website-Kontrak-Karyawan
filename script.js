@@ -87,7 +87,7 @@ const CONFIG = {
   JABATAN_ALIAS_MAP: [
     {
       canonical: 'VALIDASI SBU',
-      aliases: ['VERIFICATOR']
+      aliases: ['VERIFICATOR', 'VERIFICATOR SBU']
     },
     {
       canonical: 'DATA ANALYST & DESIGN ENGINEER',
