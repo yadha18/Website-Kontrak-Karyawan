@@ -575,6 +575,34 @@ const Handlers = {
     Utils.toast(`🗑 Karyawan "${nama}" berhasil dihapus`);
   },
 
+  // ✅ BARU: Hapus semua karyawan
+  openModalHapusSemua() {
+    if (!AppState.karyawan.length) return Utils.toast('ℹ️ Tidak ada data karyawan untuk dihapus.');
+    document.getElementById('deleteAllCount').textContent = AppState.karyawan.length + ' karyawan';
+    document.getElementById('inputKonfirmasiHapusSemua').value = '';
+    document.getElementById('btnConfirmDeleteAll').disabled = true;
+    document.getElementById('btnConfirmDeleteAll').style.opacity = '0.5';
+    document.getElementById('btnConfirmDeleteAll').style.cursor = 'not-allowed';
+    document.getElementById('modalConfirmDeleteAll').classList.add('open');
+  },
+
+  confirmHapusSemua() {
+    const input = document.getElementById('inputKonfirmasiHapusSemua').value;
+    if (input !== 'HAPUS SEMUA') return;
+
+    const jumlah = AppState.karyawan.length;
+    AppState.log.push(Models.LogChange('SYSTEM', 'SYSTEM', 'hapus semua', `${jumlah} karyawan`, '(semua dihapus)'));
+    AppState.karyawan = [];
+    AppState.pagination.page = 1;
+    DB.save();
+
+    UI.closeModal('modalConfirmDeleteAll');
+    UI.renderKaryawanTable();
+    UI.renderDashboard();
+    UI.updateBadge();
+    Utils.toast(`🗑 Semua data karyawan (${jumlah}) berhasil dihapus`);
+  },
+
   addJabatan() {
     const nama = document.getElementById('inputJabatanNama').value.trim().toUpperCase();
     if (!nama) return Utils.toast('❌ Nama jabatan wajib diisi!');
@@ -636,7 +664,9 @@ window.openModalPindah  = (id)   => Handlers.openQuickMoveModal(id);
 window.simpanPindah     = ()     => Handlers.saveQuickMove();
 window.tambahJabatan    = ()     => Handlers.addJabatan();
 window.exportExcel      = ()     => Handlers.exportToExcel();
-window.confirmDeleteKaryawan = () => Handlers.confirmDeleteKaryawan(); // ✅ BARU
+window.confirmDeleteKaryawan = () => Handlers.confirmDeleteKaryawan();
+window.openModalHapusSemua   = () => Handlers.openModalHapusSemua();   // ✅ BARU
+window.confirmHapusSemua     = () => Handlers.confirmHapusSemua();     // ✅ BARU
 
 // Initialize application
 UI.init();

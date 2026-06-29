@@ -94,7 +94,10 @@
             <h1>Data Karyawan</h1>
             <p>Semua data detail karyawan. Anda dapat mengedit seluruh data & status secara manual.</p>
           </div>
-          <button class="btn btn-primary" onclick="openModalEdit(null)">➕ Tambah Karyawan Manual</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-danger" onclick="openModalHapusSemua()">🗑 Hapus Semua</button>
+            <button class="btn btn-primary" onclick="openModalEdit(null)">➕ Tambah Karyawan Manual</button>
+          </div>
         </div>
       </div>
       <div class="search-bar">
@@ -288,6 +291,42 @@
     <div class="flex-end" style="margin-top: 20px;">
       <button class="btn btn-secondary" onclick="closeModal('modalPindah')">Batal</button>
       <button class="btn btn-primary" onclick="simpanPindah()">Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal Konfirmasi Hapus Semua Karyawan -->
+<div class="modal-overlay" id="modalConfirmDeleteAll">
+  <div class="modal" style="width: 480px;">
+    <div class="modal-header">
+      <h2>🗑 Hapus Semua Data Karyawan</h2>
+      <button class="modal-close" onclick="closeModal('modalConfirmDeleteAll')">✕</button>
+    </div>
+
+    <div class="info-note" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:var(--danger);margin-bottom:20px;">
+      ⚠️ <strong>Peringatan keras!</strong> Seluruh data karyawan akan dihapus permanen dan tidak dapat dikembalikan.
+    </div>
+
+    <div class="card" style="background:var(--surface2);border-color:var(--border2);margin-bottom:20px;">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase;">Ringkasan data yang akan dihapus</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;">
+        <span style="color:var(--text2);">Total Karyawan</span>
+        <span style="font-weight:700;color:var(--danger);" id="deleteAllCount">0</span>
+        <span style="color:var(--text2);">Log Perubahan</span>
+        <span id="deleteAllKeepLog" style="color:var(--text2);font-size:12px;">Akan tetap disimpan</span>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:20px;">
+      <label class="form-label" style="color:var(--danger);">Ketik <strong>HAPUS SEMUA</strong> untuk konfirmasi</label>
+      <input type="text" class="form-control" id="inputKonfirmasiHapusSemua" placeholder="HAPUS SEMUA"
+        oninput="const ok = this.value === 'HAPUS SEMUA'; const btn = document.getElementById('btnConfirmDeleteAll'); btn.disabled = !ok; btn.style.opacity = ok ? '1' : '0.5'; btn.style.cursor = ok ? 'pointer' : 'not-allowed';"
+        style="border-color:rgba(239,68,68,.4);">
+    </div>
+
+    <div class="flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modalConfirmDeleteAll')">Batal</button>
+      <button class="btn btn-danger" id="btnConfirmDeleteAll" onclick="confirmHapusSemua()" disabled style="background:var(--danger);color:#fff;opacity:0.5;cursor:not-allowed;">🗑 Hapus Semua Data</button>
     </div>
   </div>
 </div>
