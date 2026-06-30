@@ -44,10 +44,34 @@
         <div class="stat-card"><div class="stat-label">Total Jabatan Tersedia</div><div class="stat-value" id="stat-types">0</div></div>
       </div>
 
+      <!-- ✅ BARU: Statistik Slot Karyawan Keseluruhan (Fix 264) -->
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">📌 Total Slot Fix</div><div class="stat-value purple" id="stat-slot-total">0</div></div>
+        <div class="stat-card"><div class="stat-label">✅ Slot Terisi</div><div class="stat-value accent" id="stat-slot-terisi">0</div></div>
+        <div class="stat-card"><div class="stat-label">🟡 Slot Tersisa</div><div class="stat-value warning" id="stat-slot-sisa">0</div></div>
+      </div>
+
+      <!-- ✅ BARU: Bar Chart Tipe Karyawan Bulan Berjalan -->
       <div class="card">
-        <div class="flex-between" style="align-items: center; margin-bottom: 16px;">
+        <div class="card-title">📊 Tipe Karyawan — Bulan Berjalan</div>
+        <div id="chart-tipe-karyawan"></div>
+      </div>
+
+      <!-- ✅ BARU: Rincian Slot Jabatan per SBU -->
+      <div class="card">
+        <div class="card-title">📌 Slot Jabatan per SBU (Fix: 264 Total)</div>
+        <div id="slot-jabatan-table"></div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between" style="align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
           <div class="card-title" style="margin: 0;">🔄 Review Log Perubahan</div>
-          <input type="text" id="searchLog" placeholder="🔍 Cari log (NIP, Nama, Tipe)..." class="form-control" style="max-width: 250px;" oninput="renderDashboard()">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <select id="filterLogType" class="form-control" style="max-width:180px;" onchange="renderDashboard()">
+              <option value="">Semua Tipe</option>
+            </select>
+            <input type="text" id="searchLog" placeholder="🔍 Cari log (NIP, Nama, Tipe)..." class="form-control" style="max-width: 250px;" oninput="renderDashboard()">
+          </div>
         </div>
         <div id="dash-changes">
           <div class="empty"><div class="empty-icon">📋</div><h3>Belum ada perubahan</h3><p>Log akan muncul saat ada perubahan data karyawan.</p></div>
@@ -61,7 +85,7 @@
     <div class="page" id="page-upload">
       <div class="page-header">
         <h1>Upload Data Karyawan</h1>
-        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email.</p>
+        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email, Email Korporat, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon.</p>
       </div>
       <div class="card">
         <div class="card-title">📂 Pilih File Excel</div>
@@ -114,7 +138,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>Jabatan</th><th>SBU</th><th>BKO Jabatan</th><th>BKO SBU</th><th>Slot BOQ</th><th>Slot Real</th><th>NIP Baru</th><th>Email</th><th>Tgl Update</th><th>Status</th></tr>
+            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>NIK</th><th>Jabatan</th><th>SBU</th><th>BKO Jabatan</th><th>BKO SBU</th><th>Slot BOQ</th><th>Slot Real</th><th>NIP Baru</th><th>Email Pribadi</th><th>Email Korporat</th><th>No. Telp</th><th>Ukuran Baju</th><th>Tgl Masuk</th><th>Tgl Keluar</th><th>Tgl Update</th><th>Status</th></tr>
           </thead>
           <tbody id="karyawanBody"></tbody>
         </table>
@@ -196,6 +220,18 @@
         <input type="text" class="form-control" id="editNama">
       </div>
     </div>
+
+    <!-- ✅ BARU: NIK -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">NIK</label>
+        <input type="text" class="form-control" id="editNIK" placeholder="Nomor Induk Kependudukan">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ukuran Baju</label>
+        <select class="form-control" id="editUkuranBaju"></select>
+      </div>
+    </div>
     
     <div class="form-row">
       <div class="form-group">
@@ -237,8 +273,33 @@
         <input type="text" class="form-control" id="editNIPBaru">
       </div>
       <div class="form-group">
-        <label class="form-label">Email</label>
+        <label class="form-label">Email Pribadi</label>
         <input type="email" class="form-control" id="editEmail">
+      </div>
+    </div>
+
+    <!-- ✅ BARU: Email Korporat -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Email Korporat</label>
+        <input type="email" class="form-control" id="editEmailKorporat" placeholder="nama@perusahaan.co.id">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nomor Telpon Aktif</label>
+        <input type="text" class="form-control" id="editNoTelp" placeholder="+62812xxxxxxx"
+          oninput="this.value = window.HandlersFormatPhone ? window.HandlersFormatPhone(this.value) : this.value;">
+      </div>
+    </div>
+
+    <!-- ✅ BARU: Tanggal Masuk & Tanggal Keluar -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tanggal Masuk</label>
+        <input type="date" class="form-control" id="editTglMasuk">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tanggal Keluar</label>
+        <input type="date" class="form-control" id="editTglKeluar">
       </div>
     </div>
 

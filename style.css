@@ -197,3 +197,34 @@ select.form-control { cursor: pointer; }
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ✅ BARU: SLOT JABATAN ACCORDION */
+.slot-accordion { display: flex; flex-direction: column; gap: 10px; }
+.slot-accordion-item { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.slot-accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface2);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: 'Inter', sans-serif;
+  transition: background .15s;
+}
+.slot-accordion-header:hover { background: var(--border); }
+.slot-accordion-arrow {
+  font-size: 10px;
+  color: var(--text2);
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+.slot-accordion-arrow.open { transform: rotate(90deg); }
+.slot-accordion-title { font-weight: 700; font-size: 13.5px; color: var(--text); flex: 1; }
+.slot-accordion-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
+.slot-accordion-stats strong { color: var(--text); }
+.slot-accordion-body { background: var(--surface); }
+.slot-accordion-body .table-wrap { border-left: none; border-right: none; border-bottom: none; }
+.slot-accordion-body table { min-width: unset; }

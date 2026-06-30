@@ -87,7 +87,7 @@ const CONFIG = {
   JABATAN_ALIAS_MAP: [
     {
       canonical: 'VALIDASI SBU',
-      aliases: ['VERIFICATOR', 'VERIFICATOR SBU']
+      aliases: ['VERIFICATOR']
     },
     {
       canonical: 'DATA ANALYST & DESIGN ENGINEER',
@@ -121,7 +121,104 @@ const CONFIG = {
       canonical: 'COLLECTION SBU',
       aliases: ['COLLECTION SBU']
     }
-  ]
+  ],
+
+  // ✅ BARU: Opsi dropdown ukuran baju
+  UKURAN_BAJU: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
+
+  // ✅ BARU: Total slot karyawan keseluruhan (fix/ditetapkan)
+  TOTAL_SLOT_KARYAWAN: 264,
+
+  // ✅ BARU: Rincian slot per SBU dan Jabatan (fix/ditetapkan)
+  // Struktur: { [SBU]: { total: number, jabatan: { [NamaJabatan]: jumlahSlot } } }
+  SLOT_PER_SBU: {
+    'BALI & NUSA TENGGARA': {
+      total: 21,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 4, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
+        'COLLECTION SBU': 7, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'JAKARTA & BANTEN': {
+      total: 26,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 7, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1, 'ADMINISTRASI SALES': 1,
+        'COLLECTION SBU': 8, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'JAWA BAGIAN BARAT': {
+      total: 26,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 9, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1, 'ADMINISTRASI SALES': 1,
+        'COLLECTION SBU': 6, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'JAWA BAGIAN TENGAH': {
+      total: 26,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 10, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
+        'COLLECTION SBU': 6, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'JAWA BAGIAN TIMUR': {
+      total: 24,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 7, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
+        'COLLECTION SBU': 7, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'KALIMANTAN': {
+      total: 22,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 6, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
+        'COLLECTION SBU': 6, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'PUSAT': {
+      total: 26,
+      jabatan: {
+        'ADMINISTRASI SALES': 13, 'COLLECTION PUSAT': 9,
+        'DATA ANALYST & DESIGN ENGINEER': 2, 'OFFICER MARKETING': 2
+      }
+    },
+    'SULAWESI & INDONESIA TIMUR': {
+      total: 20,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 7, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'COLLECTION SBU': 5, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'SUMATERA BAGIAN SELATAN': {
+      total: 24,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 8, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
+        'COLLECTION SBU': 6, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'SUMATERA BAGIAN TENGAH': {
+      total: 23,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 6, 'ACCOUNT EXECUTIVE GRADE 2': 4,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
+        'COLLECTION SBU': 7, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
+      }
+    },
+    'SUMATERA BAGIAN UTARA': {
+      total: 25,
+      jabatan: {
+        'ACCOUNT EXECUTIVE GRADE 1': 15, 'ACCOUNT EXECUTIVE GRADE 2': 2,
+        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
+        'COLLECTION SBU': 4, 'OFFICER MARKETING': 2
+      }
+    }
+  }
 };
 
 const STATUS_DEF = {
@@ -138,7 +235,8 @@ const AppState = {
   previewUpload: [],
   
   pagination: { page: 1, size: 10 },
-  modals: { editTargetId: null, statusTargetId: null }
+  modals: { editTargetId: null, statusTargetId: null },
+  slotPanelOpen: {} // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
 };
 
 // ─── 3. DATA MODELS (CONTROLLED STRUCTURE) ──────────────────────────────────
@@ -148,6 +246,7 @@ const Models = {
       id:            data.id || Date.now() + Math.random(),
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
+      NIK:           String(data.NIK || '').trim(),                          // ✅ BARU
       Jabatan:       Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       SBU:           Utils.resolveSBU(String(data.SBU || '').trim()),
       BKOJabatan:    Utils.resolveJabatan(String(data.BKOJabatan || '').trim()),
@@ -155,7 +254,12 @@ const Models = {
       SlotBOQ:       String(data.SlotBOQ || '').trim(),
       SlotReal:      String(data.SlotReal || '').trim(),
       NIPBaru:       String(data.NIPBaru || '').trim(),
-      Email:         String(data.Email || '').trim(),
+      Email:         String(data.Email || '').trim(),                        // Email Pribadi (lama)
+      EmailKorporat: String(data.EmailKorporat || '').trim(),                // ✅ BARU
+      TglMasuk:      String(data.TglMasuk || '').trim(),                     // ✅ BARU
+      TglKeluar:     String(data.TglKeluar || '').trim(),                    // ✅ BARU
+      UkuranBaju:    String(data.UkuranBaju || '').trim().toUpperCase(),     // ✅ BARU
+      NoTelp:        Utils.normalizePhone(data.NoTelp || ''),                // ✅ BARU
       TglUpdate:     data.TglUpdate || Utils.getTodayDate(),
       Status:        data.Status || 'Aktif',
       StatusManual:  typeof data.StatusManual === 'boolean' ? data.StatusManual : false,
@@ -229,6 +333,23 @@ const Utils = {
 
     // 3. Tidak cocok — kembalikan nilai asli (uppercase)
     return upper;
+  },
+
+  // ✅ BARU: Normalisasi nomor telepon ke format +62
+  // Menerima input: 08xxx, 8xxx, 628xxx, +628xxx → semua dikonversi ke +62xxx
+  normalizePhone(raw) {
+    if (!raw) return '';
+    let digits = String(raw).trim().replace(/[\s\-()]/g, '');
+    digits = digits.replace(/^\+/, ''); // buang + di depan dulu biar mudah diproses
+
+    if (digits.startsWith('62')) {
+      digits = digits.slice(2);
+    } else if (digits.startsWith('0')) {
+      digits = digits.slice(1);
+    }
+
+    if (!digits) return '';
+    return '+62' + digits;
   },
   statusPill(status) {
     const s = STATUS_DEF[status] || { pill: 'pill-gray', label: status || '—' };
@@ -354,10 +475,40 @@ const UI = {
     document.getElementById('stat-changed').textContent= log.length;
     document.getElementById('stat-types').textContent  = jabatan.length;
 
+    // ✅ BARU: Slot karyawan keseluruhan (fix 264, otomatis bertambah saat resign)
+    const aktifCount = karyawan.filter(k => k.Status === 'Aktif' || k.Status === 'Baru Masuk').length;
+    const slotTersisa = CONFIG.TOTAL_SLOT_KARYAWAN - aktifCount;
+    const elSlotTotal = document.getElementById('stat-slot-total');
+    const elSlotTerisi = document.getElementById('stat-slot-terisi');
+    const elSlotSisa = document.getElementById('stat-slot-sisa');
+    if (elSlotTotal)  elSlotTotal.textContent  = CONFIG.TOTAL_SLOT_KARYAWAN;
+    if (elSlotTerisi) elSlotTerisi.textContent = aktifCount;
+    if (elSlotSisa)   elSlotSisa.textContent   = slotTersisa;
+
+    // ✅ BARU: Render bar chart tipe karyawan bulan berjalan
+    this.renderChartTipeKaryawan();
+
+    // ✅ BARU: Render tabel slot per SBU & Jabatan
+    this.renderSlotJabatan();
+
+    // ✅ BARU: Filter berdasarkan tipe log (dropdown), digabung dengan search teks
     const qLog = (document.getElementById('searchLog')?.value || '').toLowerCase();
+    const fLogType = document.getElementById('filterLogType')?.value || '';
+
+    // Isi dropdown tipe log secara dinamis dari data log yang ada
+    const elFilterLogType = document.getElementById('filterLogType');
+    if (elFilterLogType) {
+      const curVal = elFilterLogType.value;
+      const uniqueTypes = [...new Set(log.map(c => c.type))].sort();
+      elFilterLogType.innerHTML = '<option value="">Semua Tipe</option>' +
+        uniqueTypes.map(t => `<option value="${t}">${t.toUpperCase()}</option>`).join('');
+      elFilterLogType.value = curVal;
+    }
+
     const filteredLog = log.filter(c => 
-      !qLog || c.nik.toLowerCase().includes(qLog) || c.nama.toLowerCase().includes(qLog) || 
-      c.type.toLowerCase().includes(qLog) || c.oldVal.toLowerCase().includes(qLog) || c.newVal.toLowerCase().includes(qLog)
+      (!qLog || c.nik.toLowerCase().includes(qLog) || c.nama.toLowerCase().includes(qLog) || 
+        c.type.toLowerCase().includes(qLog) || c.oldVal.toLowerCase().includes(qLog) || c.newVal.toLowerCase().includes(qLog)) &&
+      (!fLogType || c.type === fLogType)
     );
 
     const container = document.getElementById('dash-changes');
@@ -393,6 +544,102 @@ const UI = {
       </div>`;
   },
 
+  // ✅ BARU: Render bar chart sederhana (SVG) untuk tipe karyawan bulan berjalan
+  renderChartTipeKaryawan() {
+    const elChart = document.getElementById('chart-tipe-karyawan');
+    if (!elChart) return;
+
+    const now = new Date();
+    const bulanIni = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const labelBulan = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+
+    // Karyawan yang TglUpdate-nya di bulan berjalan, dikelompokkan per status
+    const dataBulanIni = AppState.karyawan.filter(k => (k.TglUpdate || '').startsWith(bulanIni));
+    const jumlahBaru   = dataBulanIni.filter(k => k.Status === 'Baru Masuk').length;
+    const jumlahAktif  = dataBulanIni.filter(k => k.Status === 'Aktif').length;
+    const jumlahResign = dataBulanIni.filter(k => k.Status === 'Resign').length;
+
+    const data = [
+      { label: 'Baru Masuk', value: jumlahBaru,   color: 'var(--success)' },
+      { label: 'Aktif',      value: jumlahAktif,  color: 'var(--accent2)' },
+      { label: 'Resign',     value: jumlahResign, color: 'var(--danger)' }
+    ];
+    const maxVal = Math.max(1, ...data.map(d => d.value));
+
+    const barWidth = 90, gap = 60, chartHeight = 160, startX = 40;
+    const svgWidth = data.length * (barWidth + gap) + startX;
+
+    const bars = data.map((d, i) => {
+      const x = startX + i * (barWidth + gap);
+      const h = (d.value / maxVal) * chartHeight;
+      const y = chartHeight - h + 20;
+      return `
+        <text x="${x + barWidth/2}" y="${y - 10}" text-anchor="middle" fill="var(--text)" font-size="15" font-weight="700" font-family="JetBrains Mono, monospace">${d.value}</text>
+        <rect x="${x}" y="${y}" width="${barWidth}" height="${h}" rx="6" fill="${d.color}" opacity="0.85"/>
+        <text x="${x + barWidth/2}" y="${chartHeight + 42}" text-anchor="middle" fill="var(--text2)" font-size="12" font-family="Inter, sans-serif">${d.label}</text>
+      `;
+    }).join('');
+
+    elChart.innerHTML = `
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Periode: <strong style="color:var(--text)">${labelBulan}</strong> (berdasarkan tanggal update data)</div>
+      <svg viewBox="0 0 ${svgWidth} 210" style="width:100%;max-width:480px;height:auto;">
+        <line x1="0" y1="${chartHeight + 20}" x2="${svgWidth}" y2="${chartHeight + 20}" stroke="var(--border2)" stroke-width="1"/>
+        ${bars}
+      </svg>`;
+  },
+
+  // ✅ BARU: Render tabel rincian slot fix per SBU & Jabatan vs realisasi
+  renderSlotJabatan() {
+    const elSlot = document.getElementById('slot-jabatan-table');
+    if (!elSlot) return;
+
+    const aktifKaryawan = AppState.karyawan.filter(k => k.Status === 'Aktif' || k.Status === 'Baru Masuk');
+
+    // ✅ BARU: Render sebagai accordion per SBU (collapsed by default) agar tidak memanjang ke bawah
+    const panels = Object.entries(CONFIG.SLOT_PER_SBU).map(([sbu, detail], idx) => {
+      const terisiSBU = aktifKaryawan.filter(k => k.SBU === sbu).length;
+      const sisaSBU = detail.total - terisiSBU;
+      const statusColorSBU = sisaSBU < 0 ? 'var(--danger)' : sisaSBU === 0 ? 'var(--success)' : 'var(--warning)';
+      const panelId = `slot-panel-${idx}`;
+      const isOpen = AppState.slotPanelOpen && AppState.slotPanelOpen[sbu];
+
+      const jabatanRows = Object.entries(detail.jabatan).map(([jab, slotFix]) => {
+        const terisi = aktifKaryawan.filter(k => k.SBU === sbu && k.Jabatan === jab).length;
+        const sisa = slotFix - terisi;
+        const statusColor = sisa < 0 ? 'var(--danger)' : sisa === 0 ? 'var(--success)' : 'var(--warning)';
+        return `<tr>
+          <td style="padding-left:24px;color:var(--text2);font-size:12px;">${jab}</td>
+          <td class="mono" style="text-align:center;">${slotFix}</td>
+          <td class="mono" style="text-align:center;">${terisi}</td>
+          <td class="mono" style="text-align:center;color:${statusColor};font-weight:600;">${sisa}</td>
+        </tr>`;
+      }).join('');
+
+      return `
+        <div class="slot-accordion-item">
+          <button class="slot-accordion-header" onclick="Handlers.toggleSlotPanel('${sbu.replace(/'/g, "\\'")}')">
+            <span class="slot-accordion-arrow ${isOpen ? 'open' : ''}">▶</span>
+            <span class="slot-accordion-title">${sbu}</span>
+            <span class="slot-accordion-stats">
+              <span class="mono">Fix: <strong>${detail.total}</strong></span>
+              <span class="mono">Terisi: <strong>${terisiSBU}</strong></span>
+              <span class="mono" style="color:${statusColorSBU};">Sisa: <strong>${sisaSBU}</strong></span>
+            </span>
+          </button>
+          <div class="slot-accordion-body" id="${panelId}" style="display:${isOpen ? 'block' : 'none'};">
+            <div class="table-wrap" style="border-top:none;border-radius:0 0 10px 10px;">
+              <table>
+                <thead><tr><th>Jabatan</th><th style="text-align:center;">Slot Fix</th><th style="text-align:center;">Terisi</th><th style="text-align:center;">Sisa</th></tr></thead>
+                <tbody>${jabatanRows}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    elSlot.innerHTML = `<div class="slot-accordion">${panels}</div>`;
+  },
+
   renderKaryawanTable() {
     const { karyawan, pagination } = AppState;
     const q    = (document.getElementById('searchKaryawan')?.value || '').toLowerCase();
@@ -414,7 +661,7 @@ const UI = {
     const pageContainer = document.getElementById('paginationKaryawan');
 
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="14"><div class="empty"><div class="empty-icon">👥</div><h3>Tidak ada data</h3></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="20"><div class="empty"><div class="empty-icon">👥</div><h3>Tidak ada data</h3></div></td></tr>`;
       pageContainer.style.display = 'none';
       return;
     }
@@ -434,9 +681,17 @@ const UI = {
           <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="Handlers.deleteKaryawan(${k.id})">🗑 Hapus</button>
         </td>
         <td class="mono">${k.NIP}</td><td style="font-weight:500">${k.Nama}</td>
+        <td class="mono">${k.NIK || '—'}</td>
         <td><span class="pill pill-blue">${k.Jabatan}</span></td><td>${k.SBU}</td>
         <td>${k.BKOJabatan}</td><td>${k.BKOSBU}</td><td>${k.SlotBOQ}</td><td>${k.SlotReal}</td>
-        <td class="mono">${k.NIPBaru}</td><td>${k.Email}</td><td style="font-size:12px;color:var(--text2)">${k.TglUpdate}</td>
+        <td class="mono">${k.NIPBaru}</td>
+        <td>${k.Email || '—'}</td>
+        <td>${k.EmailKorporat || '—'}</td>
+        <td>${k.NoTelp || '—'}</td>
+        <td>${k.UkuranBaju ? `<span class="pill pill-gray">${k.UkuranBaju}</span>` : '—'}</td>
+        <td style="font-size:12px;color:var(--text2)">${k.TglMasuk || '—'}</td>
+        <td style="font-size:12px;color:var(--text2)">${k.TglKeluar || '—'}</td>
+        <td style="font-size:12px;color:var(--text2)">${k.TglUpdate}</td>
         <td>${Utils.statusPill(k.Status)}${k.StatusCatatan ? `<br><span style="font-size:10px;color:var(--text2)">${k.StatusCatatan}</span>` : ''}</td>
       </tr>`).join('');
 
@@ -537,7 +792,8 @@ const Handlers = {
       const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
       if (!raw.length) return Utils.toast('❌ File kosong!');
 
-      const COLS = ['NIP','Nama','Jabatan','SBU','BKO Jabatan','BKO SBU','Slot BOQ','Slot Real','NIP Baru','Email'];
+      const COLS = ['NIP','Nama','NIK','Jabatan','SBU','BKO Jabatan','BKO SBU','Slot BOQ','Slot Real','NIP Baru',
+        'Email','Email Korporat','Tanggal Masuk','Tanggal Keluar','Ukuran Baju','Nomor Telpon'];
       const header = raw[0].map(h => String(h).trim());
 
       AppState.previewUpload = raw.slice(1).map(row => {
@@ -551,7 +807,7 @@ const Handlers = {
 
       document.getElementById('previewHead').innerHTML = COLS.map(c => `<th>${c}</th>`).join('');
       document.getElementById('previewBody').innerHTML = AppState.previewUpload.slice(0, 20).map(r => `
-        <tr>${COLS.map(c => `<td class="${c === 'NIP' ? 'mono' : ''}">${r[c]}</td>`).join('')}</tr>
+        <tr>${COLS.map(c => `<td class="${c === 'NIP' || c === 'NIK' ? 'mono' : ''}">${r[c]}</td>`).join('')}</tr>
       `).join('');
       
       document.getElementById('previewCard').style.display = 'block';
@@ -567,7 +823,17 @@ const Handlers = {
   },
   confirmUpload() {
     if (!AppState.previewUpload.length) return Utils.toast('❌ Tidak ada data!');
-    EmployeeService.bulkUpload(AppState.previewUpload);
+    // ✅ BARU: Mapping nama kolom Excel ke nama field model
+    const mapped = AppState.previewUpload.map(r => ({
+      NIP: r['NIP'], Nama: r['Nama'], NIK: r['NIK'],
+      Jabatan: r['Jabatan'], SBU: r['SBU'],
+      BKOJabatan: r['BKO Jabatan'], BKOSBU: r['BKO SBU'],
+      SlotBOQ: r['Slot BOQ'], SlotReal: r['Slot Real'], NIPBaru: r['NIP Baru'],
+      Email: r['Email'], EmailKorporat: r['Email Korporat'],
+      TglMasuk: r['Tanggal Masuk'], TglKeluar: r['Tanggal Keluar'],
+      UkuranBaju: r['Ukuran Baju'], NoTelp: r['Nomor Telpon']
+    }));
+    EmployeeService.bulkUpload(mapped);
     this.cancelUpload();
     Utils.toast(`✅ Karyawan berhasil disimpan`);
     this.resetPageAndRender();
@@ -598,11 +864,19 @@ const Handlers = {
     elBKOSBU.innerHTML = '<option value="">— Pilih BKO SBU —</option>' + 
       CONFIG.DEFAULT_BKO_SBU.map(b => `<option value="${b}">${b}</option>`).join('');
 
+    // ✅ Ukuran baju dropdown
+    const elUkuranBaju = document.getElementById('editUkuranBaju');
+    if (elUkuranBaju) {
+      elUkuranBaju.innerHTML = '<option value="">— Pilih Ukuran —</option>' +
+        CONFIG.UKURAN_BAJU.map(u => `<option value="${u}">${u}</option>`).join('');
+    }
+
     const emp = id ? AppState.karyawan.find(k => k.id === id) : Models.Karyawan();
 
     // Populate field values
     document.getElementById('editNIP').value          = emp.NIP;
     document.getElementById('editNama').value         = emp.Nama;
+    document.getElementById('editNIK').value          = emp.NIK || '';                        // ✅ BARU
     document.getElementById('editJabatan').value      = emp.Jabatan;
     document.getElementById('editSBU').value          = emp.SBU;
     document.getElementById('editBKOJabatan').value   = emp.BKOJabatan; // ✅ set value dropdown
@@ -611,6 +885,11 @@ const Handlers = {
     document.getElementById('editSlotReal').value     = emp.SlotReal;
     document.getElementById('editNIPBaru').value      = emp.NIPBaru;
     document.getElementById('editEmail').value        = emp.Email;
+    document.getElementById('editEmailKorporat').value= emp.EmailKorporat || '';               // ✅ BARU
+    document.getElementById('editTglMasuk').value     = emp.TglMasuk || '';                    // ✅ BARU
+    document.getElementById('editTglKeluar').value    = emp.TglKeluar || '';                   // ✅ BARU
+    document.getElementById('editUkuranBaju').value   = emp.UkuranBaju || '';                  // ✅ BARU
+    document.getElementById('editNoTelp').value       = emp.NoTelp || '+62';                   // ✅ BARU
     document.getElementById('editStatus').value       = emp.Status;
     document.getElementById('editCatatanStatus').value= emp.StatusCatatan;
 
@@ -625,14 +904,20 @@ const Handlers = {
 
     const formData = {
       NIP, Nama,
-      Jabatan:    document.getElementById('editJabatan').value,
-      SBU:        document.getElementById('editSBU').value,
-      BKOJabatan: document.getElementById('editBKOJabatan').value.toUpperCase(), // ✅ uppercase
-      BKOSBU:     document.getElementById('editBKOSBU').value.toUpperCase(),     // ✅ uppercase
-      SlotBOQ:    document.getElementById('editSlotBOQ').value,
-      SlotReal:   document.getElementById('editSlotReal').value,
-      NIPBaru:    document.getElementById('editNIPBaru').value,
-      Email:      document.getElementById('editEmail').value
+      NIK:           document.getElementById('editNIK').value,               // ✅ BARU
+      Jabatan:       document.getElementById('editJabatan').value,
+      SBU:           document.getElementById('editSBU').value,
+      BKOJabatan:    document.getElementById('editBKOJabatan').value.toUpperCase(), // ✅ uppercase
+      BKOSBU:        document.getElementById('editBKOSBU').value.toUpperCase(),     // ✅ uppercase
+      SlotBOQ:       document.getElementById('editSlotBOQ').value,
+      SlotReal:      document.getElementById('editSlotReal').value,
+      NIPBaru:       document.getElementById('editNIPBaru').value,
+      Email:         document.getElementById('editEmail').value,
+      EmailKorporat: document.getElementById('editEmailKorporat').value,     // ✅ BARU
+      TglMasuk:      document.getElementById('editTglMasuk').value,          // ✅ BARU
+      TglKeluar:     document.getElementById('editTglKeluar').value,         // ✅ BARU
+      UkuranBaju:    document.getElementById('editUkuranBaju').value,        // ✅ BARU
+      NoTelp:        document.getElementById('editNoTelp').value             // ✅ BARU
     };
 
     const statusData = {
@@ -651,6 +936,7 @@ const Handlers = {
 
     UI.closeModal('modalEditData');
     UI.renderKaryawanTable();
+    UI.renderDashboard();
     UI.updateBadge();
   },
 
@@ -739,6 +1025,12 @@ const Handlers = {
     Utils.toast(`🗑 Semua data karyawan (${jumlah}) berhasil dihapus`);
   },
 
+  // ✅ BARU: Toggle buka/tutup panel accordion slot jabatan per SBU
+  toggleSlotPanel(sbu) {
+    AppState.slotPanelOpen[sbu] = !AppState.slotPanelOpen[sbu];
+    UI.renderSlotJabatan();
+  },
+
   addJabatan() {
     const nama = document.getElementById('inputJabatanNama').value.trim().toUpperCase();
     if (!nama) return Utils.toast('❌ Nama jabatan wajib diisi!');
@@ -762,9 +1054,12 @@ const Handlers = {
     if (!AppState.karyawan.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
 
     const rows = AppState.karyawan.map(k => ({
-      'NIP': k.NIP, 'Nama': k.Nama, 'Jabatan': k.Jabatan, 'SBU': k.SBU,
+      'NIP': k.NIP, 'Nama': k.Nama, 'NIK': k.NIK, 'Jabatan': k.Jabatan, 'SBU': k.SBU,
       'BKO Jabatan': k.BKOJabatan, 'BKO SBU': k.BKOSBU, 'Slot BOQ': k.SlotBOQ, 
-      'Slot Real': k.SlotReal, 'NIP Baru': k.NIPBaru, 'Email': k.Email,
+      'Slot Real': k.SlotReal, 'NIP Baru': k.NIPBaru,
+      'Email': k.Email, 'Email Korporat': k.EmailKorporat,
+      'Tanggal Masuk': k.TglMasuk, 'Tanggal Keluar': k.TglKeluar,
+      'Ukuran Baju': k.UkuranBaju, 'Nomor Telpon': k.NoTelp,
       'Tanggal Update': k.TglUpdate, 'Status': k.Status, 'Catatan Status': k.StatusCatatan
     }));
 
@@ -803,6 +1098,7 @@ window.exportExcel      = ()     => Handlers.exportToExcel();
 window.confirmDeleteKaryawan = () => Handlers.confirmDeleteKaryawan();
 window.openModalHapusSemua   = () => Handlers.openModalHapusSemua();   // ✅ BARU
 window.confirmHapusSemua     = () => Handlers.confirmHapusSemua();     // ✅ BARU
+window.HandlersFormatPhone   = (val) => Utils.normalizePhone(val);     // ✅ BARU: format real-time saat mengetik
 
 // Initialize application
 UI.init();
