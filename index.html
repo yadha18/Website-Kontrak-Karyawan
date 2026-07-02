@@ -135,6 +135,27 @@
           <option value="Resign">Resign</option>
         </select>
       </div>
+
+      <!-- ✅ BARU: Panel Download Data per SBU / Tipe Karyawan -->
+      <div class="card" style="background:var(--surface2);">
+        <div class="card-title" style="margin-bottom:12px;">⬇ Download Data per SBU / Tipe Karyawan</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+          <div class="form-group" style="max-width:260px;margin-bottom:0;">
+            <label class="form-label">SBU</label>
+            <select class="form-control" id="exportFilterSBU"><option value="">Semua SBU</option></select>
+          </div>
+          <div class="form-group" style="max-width:200px;margin-bottom:0;">
+            <label class="form-label">Tipe Karyawan</label>
+            <select class="form-control" id="exportFilterStatus">
+              <option value="">Semua Status</option>
+              <option value="Baru Masuk">🟢 Karyawan Baru</option>
+              <option value="Aktif">🔵 Karyawan Aktif</option>
+              <option value="Resign">🔴 Karyawan Resign</option>
+            </select>
+          </div>
+          <button class="btn btn-success" onclick="exportFiltered()">⬇ Unduh Excel</button>
+        </div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -421,6 +442,70 @@
     <div class="flex-end">
       <button class="btn btn-secondary" onclick="closeModal('modalConfirmDelete')">Batal</button>
       <button class="btn btn-danger" id="btnConfirmDelete" onclick="confirmDeleteKaryawan()" style="background:var(--danger);color:#fff;">🗑 Ya, Hapus Sekarang</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal Autentikasi Superadmin -->
+<div class="modal-overlay" id="modalSuperadminAuth">
+  <div class="modal" style="width: 400px;">
+    <div class="modal-header">
+      <h2>🔒 Verifikasi Superadmin</h2>
+      <button class="modal-close" onclick="closeModal('modalSuperadminAuth')">✕</button>
+    </div>
+
+    <div class="info-note" style="margin-bottom:16px;">
+      ℹ️ Mengedit slot fix jabatan memerlukan akses superadmin. Masukkan password untuk melanjutkan.
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Password Superadmin</label>
+      <input type="password" class="form-control" id="inputSuperadminPassword" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter') submitSuperadminAuth();">
+      <div id="superadminAuthError" style="display:none;color:var(--danger);font-size:12px;margin-top:8px;"></div>
+    </div>
+
+    <div class="flex-end" style="margin-top:15px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalSuperadminAuth')">Batal</button>
+      <button class="btn btn-primary" onclick="submitSuperadminAuth()">🔓 Verifikasi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal Edit Slot Fix Jabatan per SBU (khusus superadmin) -->
+<div class="modal-overlay" id="modalEditSlot">
+  <div class="modal" style="width: 560px;">
+    <div class="modal-header">
+      <h2>✏️ Edit Slot Fix — <span id="editSlotSBUName" style="color:var(--accent2)">—</span></h2>
+      <button class="modal-close" onclick="closeModal('modalEditSlot')">✕</button>
+    </div>
+
+    <div class="info-note" style="margin-bottom:16px;">
+      ℹ️ Perubahan akan tercatat di Review Log Perubahan dan berlaku untuk semua pengguna.
+    </div>
+
+    <div id="editSlotRows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+
+    <div class="divider"></div>
+
+    <div class="form-row" style="align-items:flex-end;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Tambah Jabatan Baru ke SBU Ini</label>
+        <select class="form-control" id="editSlotAddJabatan"></select>
+      </div>
+      <button class="btn btn-secondary" style="flex-shrink:0;" onclick="addEditSlotRow()">➕ Tambah</button>
+    </div>
+
+    <div class="card" style="background:var(--surface2);border-color:var(--border2);margin-top:16px;margin-bottom:0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;color:var(--text2);">Total Slot Fix SBU Ini</span>
+        <span class="mono" style="font-size:18px;font-weight:700;color:var(--purple);" id="editSlotTotalPreview">0</span>
+      </div>
+    </div>
+
+    <div class="flex-end" style="margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalEditSlot')">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditSlot()">💾 Simpan Perubahan</button>
     </div>
   </div>
 </div>

@@ -9,8 +9,11 @@ const CONFIG = {
   STORAGE_KEYS: {
     KARYAWAN: 'hris_karyawan_v10',
     JABATAN:  'hris_jabatan_v8',
-    LOG:      'hris_changes_v9'
+    LOG:      'hris_changes_v9',
+    SLOT_CONFIG: 'hris_slot_config_v1' // ✅ BARU: penyimpanan slot fix yang bisa diedit
   },
+  // ✅ BARU: Password superadmin untuk mengedit slot fix jabatan (client-side gate)
+  SUPERADMIN_PASSWORD: 'admin264',
   DEFAULT_JABATAN: [
     'ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2', 'COLLECTION SBU',
     'ACCOUNT MANAGER JUNIOR', 'ACCOUNT MANAGER SENIOR', 'OFFICER MARKETING',
@@ -233,10 +236,16 @@ const AppState = {
   jabatan: [],
   log: [],
   previewUpload: [],
-  
+  slotConfig: {}, // ✅ BARU: salinan CONFIG.SLOT_PER_SBU yang bisa diedit & disimpan
+
   pagination: { page: 1, size: 10 },
   modals: { editTargetId: null, statusTargetId: null },
-  slotPanelOpen: {} // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
+  slotPanelOpen: {}, // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
+
+  // ✅ BARU: State autentikasi superadmin (khusus sesi ini, reset saat reload halaman)
+  superadminAuthed: false,
+  pendingSuperadminAction: null, // fungsi yang dijalankan setelah password benar
+  editSlotTarget: null // nama SBU yang sedang diedit slotnya
 };
 
 // ─── 3. DATA MODELS (CONTROLLED STRUCTURE) ──────────────────────────────────
@@ -284,6 +293,23 @@ const Utils = {
   getTodayDate() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  },
+
+  // ✅ BARU: Deep clone sederhana untuk objek/array JSON-safe
+  deepClone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+  },
+
+  // ✅ BARU: Total slot fix untuk satu SBU = jumlah semua slot jabatan di dalamnya
+  slotSBUTotal(sbu) {
+    const detail = AppState.slotConfig[sbu];
+    if (!detail || !detail.jabatan) return 0;
+    return Object.values(detail.jabatan).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  },
+
+  // ✅ BARU: Total slot fix keseluruhan (dihitung dinamis dari slotConfig, bukan angka statis)
+  getTotalSlotFix() {
+    return Object.keys(AppState.slotConfig).reduce((sum, sbu) => sum + Utils.slotSBUTotal(sbu), 0);
   },
 
   // ✅ BARU: Resolve alias SBU ke nama resmi
@@ -382,15 +408,19 @@ const DB = {
     const cK = localStorage.getItem(CONFIG.STORAGE_KEYS.KARYAWAN);
     const cJ = localStorage.getItem(CONFIG.STORAGE_KEYS.JABATAN);
     const cC = localStorage.getItem(CONFIG.STORAGE_KEYS.LOG);
-    
+    const cS = localStorage.getItem(CONFIG.STORAGE_KEYS.SLOT_CONFIG); // ✅ BARU
+
     AppState.karyawan = cK ? JSON.parse(cK) : [];
     AppState.log      = cC ? JSON.parse(cC) : [];
     AppState.jabatan  = cJ ? JSON.parse(cJ) : CONFIG.DEFAULT_JABATAN.map(nama => ({ nama }));
+    // ✅ BARU: Slot config — pakai data tersimpan jika ada, kalau tidak fallback ke default di CONFIG
+    AppState.slotConfig = cS ? JSON.parse(cS) : Utils.deepClone(CONFIG.SLOT_PER_SBU);
   },
   save() {
     localStorage.setItem(CONFIG.STORAGE_KEYS.KARYAWAN, JSON.stringify(AppState.karyawan));
     localStorage.setItem(CONFIG.STORAGE_KEYS.JABATAN,  JSON.stringify(AppState.jabatan));
     localStorage.setItem(CONFIG.STORAGE_KEYS.LOG,      JSON.stringify(AppState.log));
+    localStorage.setItem(CONFIG.STORAGE_KEYS.SLOT_CONFIG, JSON.stringify(AppState.slotConfig)); // ✅ BARU
   }
 };
 
@@ -475,13 +505,14 @@ const UI = {
     document.getElementById('stat-changed').textContent= log.length;
     document.getElementById('stat-types').textContent  = jabatan.length;
 
-    // ✅ BARU: Slot karyawan keseluruhan (fix 264, otomatis bertambah saat resign)
+    // ✅ BARU: Slot karyawan keseluruhan (dihitung dinamis dari slotConfig, otomatis bertambah saat resign)
+    const totalSlotFix = Utils.getTotalSlotFix(); // ✅ DIUBAH: dinamis, bukan CONFIG.TOTAL_SLOT_KARYAWAN statis
     const aktifCount = karyawan.filter(k => k.Status === 'Aktif' || k.Status === 'Baru Masuk').length;
-    const slotTersisa = CONFIG.TOTAL_SLOT_KARYAWAN - aktifCount;
+    const slotTersisa = totalSlotFix - aktifCount;
     const elSlotTotal = document.getElementById('stat-slot-total');
     const elSlotTerisi = document.getElementById('stat-slot-terisi');
     const elSlotSisa = document.getElementById('stat-slot-sisa');
-    if (elSlotTotal)  elSlotTotal.textContent  = CONFIG.TOTAL_SLOT_KARYAWAN;
+    if (elSlotTotal)  elSlotTotal.textContent  = totalSlotFix;
     if (elSlotTerisi) elSlotTerisi.textContent = aktifCount;
     if (elSlotSisa)   elSlotSisa.textContent   = slotTersisa;
 
@@ -588,20 +619,22 @@ const UI = {
       </svg>`;
   },
 
-  // ✅ BARU: Render tabel rincian slot fix per SBU & Jabatan vs realisasi
+  // ✅ BARU: Render tabel rincian slot fix per SBU & Jabatan vs realisasi (kini bisa diedit superadmin)
   renderSlotJabatan() {
     const elSlot = document.getElementById('slot-jabatan-table');
     if (!elSlot) return;
 
     const aktifKaryawan = AppState.karyawan.filter(k => k.Status === 'Aktif' || k.Status === 'Baru Masuk');
 
-    // ✅ BARU: Render sebagai accordion per SBU (collapsed by default) agar tidak memanjang ke bawah
-    const panels = Object.entries(CONFIG.SLOT_PER_SBU).map(([sbu, detail], idx) => {
+    // ✅ Render sebagai accordion per SBU (collapsed by default) agar tidak memanjang ke bawah
+    const panels = Object.entries(AppState.slotConfig).map(([sbu, detail], idx) => {
       const terisiSBU = aktifKaryawan.filter(k => k.SBU === sbu).length;
-      const sisaSBU = detail.total - terisiSBU;
+      const totalSBU = Utils.slotSBUTotal(sbu); // ✅ DIUBAH: dihitung dari jumlah jabatan, bukan field total statis
+      const sisaSBU = totalSBU - terisiSBU;
       const statusColorSBU = sisaSBU < 0 ? 'var(--danger)' : sisaSBU === 0 ? 'var(--success)' : 'var(--warning)';
       const panelId = `slot-panel-${idx}`;
       const isOpen = AppState.slotPanelOpen && AppState.slotPanelOpen[sbu];
+      const sbuEscaped = sbu.replace(/'/g, "\\'");
 
       const jabatanRows = Object.entries(detail.jabatan).map(([jab, slotFix]) => {
         const terisi = aktifKaryawan.filter(k => k.SBU === sbu && k.Jabatan === jab).length;
@@ -617,15 +650,20 @@ const UI = {
 
       return `
         <div class="slot-accordion-item">
-          <button class="slot-accordion-header" onclick="Handlers.toggleSlotPanel('${sbu.replace(/'/g, "\\'")}')">
-            <span class="slot-accordion-arrow ${isOpen ? 'open' : ''}">▶</span>
-            <span class="slot-accordion-title">${sbu}</span>
-            <span class="slot-accordion-stats">
-              <span class="mono">Fix: <strong>${detail.total}</strong></span>
-              <span class="mono">Terisi: <strong>${terisiSBU}</strong></span>
-              <span class="mono" style="color:${statusColorSBU};">Sisa: <strong>${sisaSBU}</strong></span>
+          <div class="slot-accordion-header">
+            <span class="slot-accordion-clickzone" onclick="Handlers.toggleSlotPanel('${sbuEscaped}')">
+              <span class="slot-accordion-arrow ${isOpen ? 'open' : ''}">▶</span>
+              <span class="slot-accordion-title">${sbu}</span>
+              <span class="slot-accordion-stats">
+                <span class="mono">Fix: <strong>${totalSBU}</strong></span>
+                <span class="mono">Terisi: <strong>${terisiSBU}</strong></span>
+                <span class="mono" style="color:${statusColorSBU};">Sisa: <strong>${sisaSBU}</strong></span>
+              </span>
             </span>
-          </button>
+            <button class="btn btn-secondary btn-sm slot-edit-btn" onclick="event.stopPropagation(); Handlers.requestSlotEdit('${sbuEscaped}');" title="Edit slot fix (khusus superadmin)">
+              🔒 Edit
+            </button>
+          </div>
           <div class="slot-accordion-body" id="${panelId}" style="display:${isOpen ? 'block' : 'none'};">
             <div class="table-wrap" style="border-top:none;border-radius:0 0 10px 10px;">
               <table>
@@ -649,6 +687,14 @@ const UI = {
 
     Utils.fillSelect('filterJabatan', [...new Set(karyawan.map(k => k.Jabatan))].filter(Boolean));
     Utils.fillSelect('filterSBU', [...new Set(karyawan.map(k => k.SBU))].filter(Boolean));
+
+    // ✅ BARU: Isi dropdown filter export dengan daftar SBU resmi (bukan hanya yang sudah ada datanya)
+    const elExportSBU = document.getElementById('exportFilterSBU');
+    if (elExportSBU && !elExportSBU.dataset.filled) {
+      elExportSBU.innerHTML = '<option value="">Semua SBU</option>' +
+        CONFIG.DEFAULT_SBU.map(s => `<option value="${s}">${s}</option>`).join('');
+      elExportSBU.dataset.filled = '1';
+    }
 
     const filtered = karyawan.filter(k =>
       (!q  || k.NIP.toLowerCase().includes(q) || k.Nama.toLowerCase().includes(q) || k.SBU.toLowerCase().includes(q)) &&
@@ -1031,6 +1077,137 @@ const Handlers = {
     UI.renderSlotJabatan();
   },
 
+  // ✅ BARU: Minta autentikasi superadmin sebelum mengedit slot suatu SBU
+  requestSlotEdit(sbu) {
+    if (AppState.superadminAuthed) {
+      // Sudah terautentikasi di sesi ini — langsung buka form edit
+      this.openEditSlotModal(sbu);
+      return;
+    }
+    // Simpan aksi yang tertunda, lalu tampilkan modal password
+    AppState.pendingSuperadminAction = () => Handlers.openEditSlotModal(sbu);
+    document.getElementById('inputSuperadminPassword').value = '';
+    document.getElementById('superadminAuthError').style.display = 'none';
+    document.getElementById('modalSuperadminAuth').classList.add('open');
+    setTimeout(() => document.getElementById('inputSuperadminPassword')?.focus(), 100);
+  },
+
+  // ✅ BARU: Submit password superadmin
+  submitSuperadminAuth() {
+    const input = document.getElementById('inputSuperadminPassword').value;
+    const errEl = document.getElementById('superadminAuthError');
+
+    if (input !== CONFIG.SUPERADMIN_PASSWORD) {
+      errEl.textContent = '❌ Password salah. Coba lagi.';
+      errEl.style.display = 'block';
+      document.getElementById('inputSuperadminPassword').value = '';
+      document.getElementById('inputSuperadminPassword').focus();
+      return;
+    }
+
+    AppState.superadminAuthed = true;
+    UI.closeModal('modalSuperadminAuth');
+    Utils.toast('🔓 Akses superadmin diberikan untuk sesi ini');
+
+    const action = AppState.pendingSuperadminAction;
+    AppState.pendingSuperadminAction = null;
+    if (typeof action === 'function') action();
+  },
+
+  // ✅ BARU: Buka form edit slot fix untuk satu SBU (sudah terautentikasi)
+  openEditSlotModal(sbu) {
+    const detail = AppState.slotConfig[sbu];
+    if (!detail) return;
+
+    AppState.editSlotTarget = sbu;
+    document.getElementById('editSlotSBUName').textContent = sbu;
+    this.renderEditSlotRows();
+
+    // Isi dropdown "tambah jabatan baru" dengan jabatan yang belum ada di SBU ini
+    const elAddSelect = document.getElementById('editSlotAddJabatan');
+    const existingJabatan = Object.keys(detail.jabatan);
+    const available = CONFIG.DEFAULT_JABATAN.filter(j => !existingJabatan.includes(j));
+    elAddSelect.innerHTML = '<option value="">— Pilih Jabatan untuk Ditambahkan —</option>' +
+      available.map(j => `<option value="${j}">${j}</option>`).join('');
+
+    document.getElementById('modalEditSlot').classList.add('open');
+  },
+
+  // ✅ BARU: Render baris-baris input slot fix di dalam modal edit
+  renderEditSlotRows() {
+    const sbu = AppState.editSlotTarget;
+    const detail = AppState.slotConfig[sbu];
+    if (!detail) return;
+
+    const container = document.getElementById('editSlotRows');
+    const entries = Object.entries(detail.jabatan);
+    const total = entries.reduce((sum, [, v]) => sum + (Number(v) || 0), 0);
+
+    container.innerHTML = entries.map(([jab, val]) => `
+      <div class="edit-slot-row">
+        <span class="edit-slot-row-label">${jab}</span>
+        <input type="number" min="0" class="form-control edit-slot-row-input" value="${val}"
+          data-jabatan="${jab.replace(/"/g, '&quot;')}"
+          oninput="Handlers.updateEditSlotTotal()">
+        <button class="btn btn-danger btn-sm" onclick="Handlers.removeEditSlotRow('${jab.replace(/'/g, "\\'")}')">✕</button>
+      </div>`).join('');
+
+    document.getElementById('editSlotTotalPreview').textContent = total;
+  },
+
+  // ✅ BARU: Update preview total saat angka slot diubah (tanpa menyimpan dulu)
+  updateEditSlotTotal() {
+    const inputs = document.querySelectorAll('#editSlotRows .edit-slot-row-input');
+    let total = 0;
+    inputs.forEach(inp => { total += Number(inp.value) || 0; });
+    document.getElementById('editSlotTotalPreview').textContent = total;
+  },
+
+  // ✅ BARU: Hapus satu baris jabatan dari slot SBU yang sedang diedit (belum tersimpan)
+  removeEditSlotRow(jab) {
+    const sbu = AppState.editSlotTarget;
+    if (!confirm(`Hapus slot jabatan "${jab}" dari ${sbu}?`)) return;
+    delete AppState.slotConfig[sbu].jabatan[jab];
+    this.openEditSlotModal(sbu); // re-render (refresh dropdown tambah & baris)
+  },
+
+  // ✅ BARU: Tambah baris jabatan baru ke slot SBU yang sedang diedit (belum tersimpan)
+  addEditSlotRow() {
+    const sbu = AppState.editSlotTarget;
+    const jab = document.getElementById('editSlotAddJabatan').value;
+    if (!jab) return Utils.toast('❌ Pilih jabatan terlebih dahulu!');
+    AppState.slotConfig[sbu].jabatan[jab] = 0;
+    this.openEditSlotModal(sbu);
+  },
+
+  // ✅ BARU: Simpan perubahan slot fix — mencatat log setiap perubahan angka
+  saveEditSlot() {
+    const sbu = AppState.editSlotTarget;
+    const detail = AppState.slotConfig[sbu];
+    if (!detail) return;
+
+    const inputs = document.querySelectorAll('#editSlotRows .edit-slot-row-input');
+    let adaPerubahan = false;
+
+    inputs.forEach(inp => {
+      const jab = inp.getAttribute('data-jabatan');
+      const newVal = Math.max(0, parseInt(inp.value) || 0);
+      const oldVal = detail.jabatan[jab];
+      if (oldVal !== newVal) {
+        AppState.log.push(Models.LogChange('SLOT', sbu, 'slot jabatan', `${jab}: ${oldVal}`, `${jab}: ${newVal}`, `Diubah oleh superadmin`));
+        detail.jabatan[jab] = newVal;
+        adaPerubahan = true;
+      }
+    });
+
+    DB.save();
+    UI.closeModal('modalEditSlot');
+    UI.renderSlotJabatan();
+    UI.renderDashboard();
+    UI.updateBadge();
+    Utils.toast(adaPerubahan ? `✅ Slot fix "${sbu}" berhasil diperbarui` : 'ℹ️ Tidak ada perubahan');
+  },
+
   addJabatan() {
     const nama = document.getElementById('inputJabatanNama').value.trim().toUpperCase();
     if (!nama) return Utils.toast('❌ Nama jabatan wajib diisi!');
@@ -1050,10 +1227,12 @@ const Handlers = {
     Utils.toast('🗑 Jabatan dihapus');
   },
 
-  exportToExcel() {
-    if (!AppState.karyawan.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
+  // ✅ DIUBAH: exportToExcel kini menerima data opsional (default semua karyawan) untuk dipakai ulang oleh export terfilter
+  exportToExcel(data = null, labelSuffix = '') {
+    const sourceData = data || AppState.karyawan;
+    if (!sourceData.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
 
-    const rows = AppState.karyawan.map(k => ({
+    const rows = sourceData.map(k => ({
       'NIP': k.NIP, 'Nama': k.Nama, 'NIK': k.NIK, 'Jabatan': k.Jabatan, 'SBU': k.SBU,
       'BKO Jabatan': k.BKOJabatan, 'BKO SBU': k.BKOSBU, 'Slot BOQ': k.SlotBOQ, 
       'Slot Real': k.SlotReal, 'NIP Baru': k.NIPBaru,
@@ -1066,7 +1245,8 @@ const Handlers = {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Data Karyawan');
 
-    if (AppState.log.length) {
+    // Sheet log hanya disertakan pada export lengkap (tanpa filter)
+    if (!data && AppState.log.length) {
       const logRows = AppState.log.map(c => ({
         'Tanggal': c.ts, 'NIP': c.nik, 'Nama': c.nama, 'Tipe Ubah': c.type.toUpperCase(),
         'Data Lama': c.oldVal, 'Data Baru': c.newVal, 'Catatan': c.catatan
@@ -1074,8 +1254,29 @@ const Handlers = {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(logRows), 'Log Perubahan');
     }
 
-    XLSX.writeFile(wb, `data-karyawan-${Utils.getTodayDate()}.xlsx`);
+    const fileSuffix = labelSuffix ? `-${labelSuffix}` : '';
+    XLSX.writeFile(wb, `data-karyawan${fileSuffix}-${Utils.getTodayDate()}.xlsx`);
     Utils.toast('✅ Excel berhasil diexport!');
+  },
+
+  // ✅ BARU: Export karyawan terfilter berdasarkan SBU dan/atau tipe status
+  exportFiltered() {
+    const sbu = document.getElementById('exportFilterSBU')?.value || '';
+    const status = document.getElementById('exportFilterStatus')?.value || '';
+
+    let filtered = AppState.karyawan;
+    if (sbu) filtered = filtered.filter(k => k.SBU === sbu);
+    if (status) filtered = filtered.filter(k => k.Status === status);
+
+    if (!filtered.length) return Utils.toast('❌ Tidak ada data karyawan yang cocok dengan filter tersebut!');
+
+    // Bangun akhiran nama file berdasarkan filter yang aktif
+    const parts = [];
+    if (sbu) parts.push(sbu.replace(/[^a-zA-Z0-9]+/g, '-'));
+    if (status) parts.push(status.replace(/[^a-zA-Z0-9]+/g, '-'));
+    const labelSuffix = parts.join('_') || 'semua';
+
+    this.exportToExcel(filtered, labelSuffix);
   }
 };
 
@@ -1099,6 +1300,11 @@ window.confirmDeleteKaryawan = () => Handlers.confirmDeleteKaryawan();
 window.openModalHapusSemua   = () => Handlers.openModalHapusSemua();   // ✅ BARU
 window.confirmHapusSemua     = () => Handlers.confirmHapusSemua();     // ✅ BARU
 window.HandlersFormatPhone   = (val) => Utils.normalizePhone(val);     // ✅ BARU: format real-time saat mengetik
+window.requestSlotEdit       = (sbu) => Handlers.requestSlotEdit(sbu);         // ✅ BARU
+window.submitSuperadminAuth  = ()    => Handlers.submitSuperadminAuth();      // ✅ BARU
+window.addEditSlotRow        = ()    => Handlers.addEditSlotRow();            // ✅ BARU
+window.saveEditSlot          = ()    => Handlers.saveEditSlot();              // ✅ BARU
+window.exportFiltered        = ()    => Handlers.exportFiltered();            // ✅ BARU
 
 // Initialize application
 UI.init();
