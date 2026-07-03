@@ -86,6 +86,7 @@
       <div class="page-header">
         <h1>Upload Data Karyawan</h1>
         <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email, Email Korporat, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon.</p>
+        <p style="color:var(--warning);margin-top:4px;">🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> Baris dengan NIP yang sudah terdaftar di sistem akan otomatis dilewati saat upload — hanya data dengan NIP baru yang akan ditambahkan.</p>
       </div>
       <div class="card">
         <div class="card-title">📂 Pilih File Excel</div>
@@ -105,6 +106,7 @@
           </div>
         </div>
         <br>
+        <div id="previewStats"></div>
         <div class="table-wrap">
           <table><thead><tr id="previewHead"></tr></thead><tbody id="previewBody"></tbody></table>
         </div>

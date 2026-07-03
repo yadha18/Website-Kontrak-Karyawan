@@ -426,16 +426,40 @@ const DB = {
 
 // ─── 6. BUSINESS LOGIC (SERVICES) ───────────────────────────────────────────
 const EmployeeService = {
+  // ✅ BARU: NIP diperlakukan sebagai Primary Key — cek apakah NIP sudah dipakai karyawan lain
+  // excludeId dipakai saat mengedit data yang sudah ada (supaya tidak bentrok dengan dirinya sendiri)
+  nipExists(nip, excludeId = null) {
+    const target = String(nip || '').trim();
+    if (!target) return false;
+    return AppState.karyawan.some(k => k.NIP === target && k.id !== excludeId);
+  },
+
   add(rawData) {
+    const nip = String(rawData.NIP || '').trim();
+    // ✅ BARU: Tolak jika NIP (Primary Key) sudah terdaftar
+    if (nip && this.nipExists(nip)) {
+      return { success: false, error: 'duplicate', nip };
+    }
     const newEmployee = Models.Karyawan(rawData);
     AppState.karyawan.unshift(newEmployee);
     DB.save();
-    return newEmployee;
+    return { success: true, employee: newEmployee };
   },
 
   update(id, newData, newStatusData = null) {
     const emp = AppState.karyawan.find(k => k.id === id);
-    if (!emp) return false;
+    if (!emp) return { success: false, error: 'not_found' };
+
+    // ✅ BARU: Jika NIP diubah, pastikan NIP baru belum dipakai karyawan lain
+    if (newData.NIP !== undefined) {
+      const newNip = String(newData.NIP).trim();
+      if (newNip && this.nipExists(newNip, id)) {
+        return { success: false, error: 'duplicate', nip: newNip };
+      }
+      if (newNip && emp.NIP !== newNip) {
+        AppState.log.push(Models.LogChange(newNip, emp.Nama, 'nip', emp.NIP, newNip));
+      }
+    }
 
     if (newData.Jabatan && emp.Jabatan !== newData.Jabatan.toUpperCase()) {
       AppState.log.push(Models.LogChange(emp.NIP, emp.Nama, 'jabatan', emp.Jabatan, newData.Jabatan));
@@ -464,14 +488,59 @@ const EmployeeService = {
     emp.TglUpdate = Utils.getTodayDate();
 
     DB.save();
-    return true;
+    return { success: true, employee: emp };
   },
 
+  // ✅ BARU: Klasifikasikan setiap baris upload berdasarkan status NIP (Primary Key)
+  // Status: 'new' (data baru, akan ditambahkan), 'duplicate_existing' (NIP sudah ada di sistem, dilewati),
+  // 'duplicate_infile' (NIP duplikat di dalam file itu sendiri, hanya baris pertama yang dipakai),
+  // 'invalid' (NIP kosong, tidak bisa diproses karena NIP adalah Primary Key)
+  classifyUploadRows(dataArray) {
+    const existingNIPs = new Set(AppState.karyawan.map(k => k.NIP).filter(Boolean));
+    const seenInFile = new Set();
+    return dataArray.map(raw => {
+      const nip = String(raw.NIP || '').trim();
+      let status;
+      if (!nip) {
+        status = 'invalid';
+      } else if (existingNIPs.has(nip)) {
+        status = 'duplicate_existing';
+      } else if (seenInFile.has(nip)) {
+        status = 'duplicate_infile';
+      } else {
+        status = 'new';
+        seenInFile.add(nip);
+      }
+      return { ...raw, __uploadStatus: status };
+    });
+  },
+
+  // ✅ DIUBAH: bulkUpload kini menerapkan Primary Key NIP — hanya data baru (NIP belum pernah ada) yang ditambahkan
   bulkUpload(dataArray) {
-    const newEmployees = dataArray.map(data => Models.Karyawan(data));
+    const classified = this.classifyUploadRows(dataArray);
+    const toInsert = classified.filter(r => r.__uploadStatus === 'new');
+
+    const newEmployees = toInsert.map(data => Models.Karyawan(data));
     AppState.karyawan = AppState.karyawan.concat(newEmployees);
+
+    const stats = {
+      total: classified.length,
+      added: toInsert.length,
+      duplicateExisting: classified.filter(r => r.__uploadStatus === 'duplicate_existing').length,
+      duplicateInFile: classified.filter(r => r.__uploadStatus === 'duplicate_infile').length,
+      invalid: classified.filter(r => r.__uploadStatus === 'invalid').length
+    };
+
+    if (stats.total > 0) {
+      AppState.log.push(Models.LogChange(
+        'SYSTEM', 'SYSTEM', 'upload',
+        `${stats.total} baris diproses`,
+        `${stats.added} baru ditambahkan, ${stats.duplicateExisting + stats.duplicateInFile} duplikat NIP dilewati, ${stats.invalid} NIP kosong dilewati`
+      ));
+    }
+
     DB.save();
-    return newEmployees.length;
+    return stats;
   }
 };
 
@@ -851,10 +920,42 @@ const Handlers = {
         return obj;
       }).filter(r => r.NIP || r.Nama);
 
-      document.getElementById('previewHead').innerHTML = COLS.map(c => `<th>${c}</th>`).join('');
-      document.getElementById('previewBody').innerHTML = AppState.previewUpload.slice(0, 20).map(r => `
-        <tr>${COLS.map(c => `<td class="${c === 'NIP' || c === 'NIK' ? 'mono' : ''}">${r[c]}</td>`).join('')}</tr>
-      `).join('');
+      // ✅ BARU: Klasifikasikan setiap baris berdasarkan status NIP (Primary Key) untuk ditampilkan di preview
+      const classified = EmployeeService.classifyUploadRows(AppState.previewUpload);
+      const statusBadge = {
+        new:               '<span class="pill pill-green">✔ Baru</span>',
+        duplicate_existing:'<span class="pill pill-yellow">⚠ NIP Sudah Ada</span>',
+        duplicate_infile:  '<span class="pill pill-yellow">⚠ Duplikat di File</span>',
+        invalid:           '<span class="pill pill-red">✕ NIP Kosong</span>'
+      };
+      const rowClass = {
+        new: '', duplicate_existing: 'style="opacity:0.55"', duplicate_infile: 'style="opacity:0.55"', invalid: 'style="opacity:0.4"'
+      };
+
+      // ✅ BARU: Ringkasan statistik sebelum konfirmasi
+      const stats = {
+        total: classified.length,
+        new: classified.filter(r => r.__uploadStatus === 'new').length,
+        duplicateExisting: classified.filter(r => r.__uploadStatus === 'duplicate_existing').length,
+        duplicateInFile: classified.filter(r => r.__uploadStatus === 'duplicate_infile').length,
+        invalid: classified.filter(r => r.__uploadStatus === 'invalid').length
+      };
+      const elStats = document.getElementById('previewStats');
+      if (elStats) {
+        elStats.innerHTML = `
+          <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
+            <div class="stat-card"><div class="stat-label">✔ Data Baru (akan ditambahkan)</div><div class="stat-value success">${stats.new}</div></div>
+            <div class="stat-card"><div class="stat-label">⚠ NIP Sudah Ada di Sistem</div><div class="stat-value warning">${stats.duplicateExisting}</div></div>
+            <div class="stat-card"><div class="stat-label">⚠ Duplikat di Dalam File</div><div class="stat-value warning">${stats.duplicateInFile}</div></div>
+            <div class="stat-card"><div class="stat-label">✕ NIP Kosong (tidak valid)</div><div class="stat-value danger">${stats.invalid}</div></div>
+          </div>
+          <div class="info-note">ℹ️ NIP diperlakukan sebagai <strong>Primary Key</strong>. Hanya baris berstatus <strong>Baru</strong> yang akan ditambahkan ke sistem; baris lain akan dilewati otomatis.</div>`;
+      }
+
+      document.getElementById('previewHead').innerHTML = '<th>Status</th>' + COLS.map(c => `<th>${c}</th>`).join('');
+      document.getElementById('previewBody').innerHTML = classified.slice(0, 50).map(r => `
+        <tr ${rowClass[r.__uploadStatus]}><td>${statusBadge[r.__uploadStatus]}</td>${COLS.map(c => `<td class="${c === 'NIP' || c === 'NIK' ? 'mono' : ''}">${r[c]}</td>`).join('')}</tr>
+      `).join('') + (classified.length > 50 ? `<tr><td colspan="${COLS.length + 1}" style="text-align:center;color:var(--text2);">... dan ${classified.length - 50} baris lainnya</td></tr>` : '');
       
       document.getElementById('previewCard').style.display = 'block';
       Utils.toast(`✅ Berhasil membaca ${AppState.previewUpload.length} baris data`);
@@ -879,9 +980,16 @@ const Handlers = {
       TglMasuk: r['Tanggal Masuk'], TglKeluar: r['Tanggal Keluar'],
       UkuranBaju: r['Ukuran Baju'], NoTelp: r['Nomor Telpon']
     }));
-    EmployeeService.bulkUpload(mapped);
+    // ✅ DIUBAH: bulkUpload kini mengembalikan statistik (NIP sebagai Primary Key)
+    const stats = EmployeeService.bulkUpload(mapped);
     this.cancelUpload();
-    Utils.toast(`✅ Karyawan berhasil disimpan`);
+
+    const skippedTotal = stats.duplicateExisting + stats.duplicateInFile + stats.invalid;
+    if (skippedTotal > 0) {
+      Utils.toast(`✅ ${stats.added} data baru ditambahkan. ⚠ ${skippedTotal} baris dilewati (duplikat/tidak valid).`, 5000);
+    } else {
+      Utils.toast(`✅ ${stats.added} karyawan baru berhasil disimpan`);
+    }
     this.resetPageAndRender();
     this.navigate('dashboard');
   },
@@ -971,12 +1079,26 @@ const Handlers = {
       Catatan: document.getElementById('editCatatanStatus').value.trim()
     };
 
+    // ✅ DIUBAH: NIP diperlakukan sebagai Primary Key — tangani hasil objek {success, error} dari service
+    let result;
     if (AppState.modals.editTargetId === null) {
-      EmployeeService.add({ ...formData, ...statusData });
+      result = EmployeeService.add({ ...formData, ...statusData });
+      if (!result.success) {
+        if (result.error === 'duplicate') {
+          return Utils.toast(`❌ NIP "${result.nip}" sudah terdaftar! NIP tidak boleh duplikat.`, 4000);
+        }
+        return Utils.toast('❌ Gagal menyimpan data.');
+      }
       AppState.pagination.page = 1;
       Utils.toast(`✅ Karyawan ditambahkan!`);
     } else {
-      EmployeeService.update(AppState.modals.editTargetId, formData, statusData);
+      result = EmployeeService.update(AppState.modals.editTargetId, formData, statusData);
+      if (!result.success) {
+        if (result.error === 'duplicate') {
+          return Utils.toast(`❌ NIP "${result.nip}" sudah dipakai karyawan lain! NIP tidak boleh duplikat.`, 4000);
+        }
+        return Utils.toast('❌ Gagal memperbarui data.');
+      }
       Utils.toast(`✅ Data diperbarui!`);
     }
 
