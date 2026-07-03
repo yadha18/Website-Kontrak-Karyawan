@@ -43,6 +43,10 @@ const CONFIG = {
   // Pencocokan dilakukan dengan contains (includes), bukan exact match
   SBU_ALIAS_MAP: [
     {
+      canonical: 'PUSAT',
+      aliases: ['KANTOR PUSAT','JAKARTA','PUSAT']
+    },
+    {
       canonical: 'SUMATERA BAGIAN UTARA',
       aliases: ['SBU', 'SUMBAGUT', 'PADANG SIDEMPUAN', 'MEDAN', 'ACEH']
     },
@@ -68,7 +72,7 @@ const CONFIG = {
     },
     {
       canonical: 'JAKARTA & BANTEN',
-      aliases: ['JKB', 'JAKBAN', 'JAKARTA & BANTEN', 'JAKARTA', 'BANTEN']
+      aliases: ['JKB', 'JAKBAN', 'JAKARTA & BANTEN', 'BANTEN']
     },
     {
       canonical: 'KALIMANTAN',
