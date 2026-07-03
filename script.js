@@ -1245,10 +1245,11 @@ const Handlers = {
     document.getElementById('editSlotSBUName').textContent = sbu;
     this.renderEditSlotRows();
 
-    // Isi dropdown "tambah jabatan baru" dengan jabatan yang belum ada di SBU ini
+    // ✅ DIPERBAIKI: Isi dropdown "tambah jabatan baru" dari AppState.jabatan (daftar dinamis,
+    // termasuk jabatan baru yang ditambahkan lewat halaman "Daftar Jabatan"), bukan CONFIG.DEFAULT_JABATAN yang statis
     const elAddSelect = document.getElementById('editSlotAddJabatan');
     const existingJabatan = Object.keys(detail.jabatan);
-    const available = CONFIG.DEFAULT_JABATAN.filter(j => !existingJabatan.includes(j));
+    const available = AppState.jabatan.map(j => j.nama).filter(j => !existingJabatan.includes(j));
     elAddSelect.innerHTML = '<option value="">— Pilih Jabatan untuk Ditambahkan —</option>' +
       available.map(j => `<option value="${j}">${j}</option>`).join('');
 
