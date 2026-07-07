@@ -521,6 +521,7 @@ const EmployeeService = {
   // Status: 'new' (data baru, akan ditambahkan), 'duplicate_existing' (NIP sudah ada di sistem, dilewati),
   // 'duplicate_infile' (NIP duplikat di dalam file itu sendiri, hanya baris pertama yang dipakai),
   // 'invalid' (NIP kosong, tidak bisa diproses karena NIP adalah Primary Key)
+  // Catatan: Tanggal Masuk hanya wajib untuk input manual, TIDAK diwajibkan saat upload Excel.
   classifyUploadRows(dataArray) {
     const existingNIPs = new Set(AppState.karyawan.map(k => k.NIP).filter(Boolean));
     const seenInFile = new Set();
@@ -1159,7 +1160,9 @@ const Handlers = {
   saveEditData() {
     const NIP  = document.getElementById('editNIP').value.trim();
     const Nama = document.getElementById('editNama').value.trim();
+    const TglMasuk = document.getElementById('editTglMasuk').value;
     if (!NIP || !Nama) return Utils.toast('❌ NIP dan Nama wajib diisi!');
+    if (!TglMasuk) return Utils.toast('❌ Tanggal Masuk wajib diisi!'); // ✅ BARU: validasi mandatory
 
     const formData = {
       NIP, Nama,
@@ -1173,7 +1176,7 @@ const Handlers = {
       NIPBaru:       document.getElementById('editNIPBaru').value,
       Email:         document.getElementById('editEmail').value,
       EmailKorporat: document.getElementById('editEmailKorporat').value,     // ✅ BARU
-      TglMasuk:      document.getElementById('editTglMasuk').value,          // ✅ BARU
+      TglMasuk,                                                              // ✅ DIUBAH: kini wajib diisi
       TglKeluar:     document.getElementById('editTglKeluar').value,         // ✅ BARU
       UkuranBaju:    document.getElementById('editUkuranBaju').value,        // ✅ BARU
       NoTelp:        document.getElementById('editNoTelp').value             // ✅ BARU

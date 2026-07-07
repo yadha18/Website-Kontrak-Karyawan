@@ -21,7 +21,7 @@
     <button class="nav-item active" onclick="navigate('dashboard')"><span class="icon">📊</span> Dashboard</button>
     <button class="nav-item" onclick="navigate('upload')"><span class="icon">📂</span> Upload Data</button>
     <button class="nav-item" onclick="navigate('karyawan')"><span class="icon">👥</span> Data Karyawan</button>
-    <!-- <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button> -->
+    <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button>
     <div class="nav-label">Pengaturan</div>
     <button class="nav-item" onclick="navigate('jabatan')"><span class="icon">📋</span> Daftar Jabatan</button>
   </nav>
@@ -40,12 +40,10 @@
         <div class="stat-card"><div class="stat-label">🔴 Resign</div><div class="stat-value danger" id="stat-resign">0</div></div>
         <div class="stat-card"><div class="stat-label">Data Diubah</div><div class="stat-value warning" id="stat-changed">0</div></div>
       </div>
-      <div class="stat-grid" style="grid-template-columns:1fr;margin-top:-8px">
-        <div class="stat-card"><div class="stat-label">Total Jabatan Tersedia</div><div class="stat-value" id="stat-types">0</div></div>
-      </div>
 
-      <!-- ✅ BARU: Statistik Slot Karyawan Keseluruhan (Fix 264) -->
-      <div class="stat-grid">
+      <!-- ✅ DIUBAH: Total Jabatan Tersedia kini sejajar dengan statistik slot fix/terisi/tersisa -->
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-card"><div class="stat-label">📋 Total Jabatan Tersedia</div><div class="stat-value" id="stat-types">0</div></div>
         <div class="stat-card"><div class="stat-label">📌 Total Slot Fix</div><div class="stat-value purple" id="stat-slot-total">0</div></div>
         <div class="stat-card"><div class="stat-label">✅ Slot Terisi</div><div class="stat-value accent" id="stat-slot-terisi">0</div></div>
         <div class="stat-card"><div class="stat-label">🟡 Slot Tersisa</div><div class="stat-value warning" id="stat-slot-sisa">0</div></div>
@@ -336,11 +334,11 @@
       </div>
     </div>
 
-    <!-- ✅ BARU: Tanggal Masuk & Tanggal Keluar -->
+    <!-- ✅ DIUBAH: Tanggal Masuk kini wajib diisi (mandatory) -->
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Tanggal Masuk</label>
-        <input type="date" class="form-control" id="editTglMasuk">
+        <label class="form-label">Tanggal Masuk <span style="color:var(--danger)">*</span></label>
+        <input type="date" class="form-control" id="editTglMasuk" required>
       </div>
       <div class="form-group">
         <label class="form-label">Tanggal Keluar</label>
