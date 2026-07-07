@@ -296,6 +296,20 @@ const Utils = {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   },
 
+  // ✅ BARU: Hitung jumlah bulan kalender penuh yang sudah lewat sejak suatu tanggal (format YYYY-MM-DD)
+  // Menggunakan perhitungan kalender (bukan flat 30 hari) agar akurat untuk bulan yang panjangnya berbeda-beda.
+  // Return null jika tanggal tidak valid/kosong.
+  monthsSince(dateStr) {
+    if (!dateStr) return null;
+    const start = new Date(dateStr);
+    if (isNaN(start.getTime())) return null;
+    const now = new Date();
+
+    let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+    if (now.getDate() < start.getDate()) months -= 1; // belum genap sebulan penuh di tanggal berjalan
+    return Math.max(0, months);
+  },
+
   // ✅ BARU: Deep clone sederhana untuk objek/array JSON-safe
   deepClone(obj) {
     return JSON.parse(JSON.stringify(obj));
@@ -553,6 +567,34 @@ const EmployeeService = {
 
     DB.save();
     return stats;
+  },
+
+  // ✅ BARU: Deteksi & ubah otomatis karyawan berstatus "Baru Masuk" menjadi "Aktif"
+  // setelah genap 1 bulan kalender sejak Tanggal Masuk. Karyawan yang sudah dipindah
+  // status-nya secara manual (mis. langsung ke Resign) tidak tersentuh karena filter
+  // hanya menyasar Status === 'Baru Masuk'.
+  autoUpdateNewEmployeeStatus() {
+    let count = 0;
+    AppState.karyawan.forEach(emp => {
+      if (emp.Status !== 'Baru Masuk') return;
+      if (!emp.TglMasuk) return; // tidak bisa dihitung tanpa Tanggal Masuk
+
+      const months = Utils.monthsSince(emp.TglMasuk);
+      if (months === null) return; // format tanggal tidak valid, lewati dengan aman
+
+      if (months >= 1) {
+        AppState.log.push(Models.LogChange(
+          emp.NIP, emp.Nama, 'status', 'Baru Masuk', 'Aktif',
+          'Otomatis diubah sistem — sudah genap 1 bulan sejak Tanggal Masuk'
+        ));
+        emp.Status = 'Aktif';
+        emp.TglUpdate = Utils.getTodayDate();
+        count++;
+      }
+    });
+
+    if (count > 0) DB.save();
+    return count;
   }
 };
 
@@ -560,8 +602,13 @@ const EmployeeService = {
 const UI = {
   init() {
     DB.load();
+    // ✅ BARU: Deteksi & ubah otomatis karyawan "Baru Masuk" yang sudah genap 1 bulan menjadi "Aktif"
+    const autoUpdatedCount = EmployeeService.autoUpdateNewEmployeeStatus();
     this.renderAll();
     this.setupUploadZone();
+    if (autoUpdatedCount > 0) {
+      Utils.toast(`🔄 ${autoUpdatedCount} karyawan otomatis diubah dari "Baru Masuk" menjadi "Aktif" (sudah genap 1 bulan)`, 5000);
+    }
   },
 
   renderAll() {
