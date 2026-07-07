@@ -85,7 +85,8 @@
     <div class="page" id="page-upload">
       <div class="page-header">
         <h1>Upload Data Karyawan</h1>
-        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email, Email Korporat, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon.</p>
+        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email, Email Korporat, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.</p>
+        <p style="color:var(--text2);margin-top:4px;">ℹ️ Kolom <strong>Status</strong> menerima: "Baru Masuk", "Aktif", atau "Resign" (tidak peka huruf besar/kecil). Jika kosong, akan otomatis diisi "Aktif".</p>
         <p style="color:var(--warning);margin-top:4px;">🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> Baris dengan NIP yang sudah terdaftar di sistem akan otomatis dilewati saat upload — hanya data dengan NIP baru yang akan ditambahkan.</p>
       </div>
       <div class="card">

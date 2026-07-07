@@ -43,10 +43,6 @@ const CONFIG = {
   // Pencocokan dilakukan dengan contains (includes), bukan exact match
   SBU_ALIAS_MAP: [
     {
-      canonical: 'PUSAT',
-      aliases: ['KANTOR PUSAT','JAKARTA','PUSAT']
-    },
-    {
       canonical: 'SUMATERA BAGIAN UTARA',
       aliases: ['SBU', 'SUMBAGUT', 'PADANG SIDEMPUAN', 'MEDAN', 'ACEH']
     },
@@ -72,7 +68,7 @@ const CONFIG = {
     },
     {
       canonical: 'JAKARTA & BANTEN',
-      aliases: ['JKB', 'JAKBAN', 'JAKARTA & BANTEN', 'BANTEN']
+      aliases: ['JKB', 'JAKBAN', 'JAKARTA & BANTEN', 'JAKARTA', 'BANTEN']
     },
     {
       canonical: 'KALIMANTAN',
@@ -274,7 +270,7 @@ const Models = {
       UkuranBaju:    String(data.UkuranBaju || '').trim().toUpperCase(),     // ✅ BARU
       NoTelp:        Utils.normalizePhone(data.NoTelp || ''),                // ✅ BARU
       TglUpdate:     data.TglUpdate || Utils.getTodayDate(),
-      Status:        data.Status || 'Aktif',
+      Status:        Utils.normalizeStatus(data.Status),
       StatusManual:  typeof data.StatusManual === 'boolean' ? data.StatusManual : false,
       StatusCatatan: data.StatusCatatan || ''
     };
@@ -363,6 +359,17 @@ const Utils = {
 
     // 3. Tidak cocok — kembalikan nilai asli (uppercase)
     return upper;
+  },
+
+  // ✅ BARU: Normalisasi teks status kepegawaian dari Excel ke salah satu nilai baku
+  // Menangani variasi penulisan umum (huruf besar/kecil, sinonim) — fallback ke 'Aktif' jika kosong/tidak dikenali
+  normalizeStatus(raw) {
+    const val = String(raw || '').trim().toLowerCase();
+    if (!val) return 'Aktif';
+    if (['baru masuk', 'baru', 'new', 'karyawan baru'].includes(val)) return 'Baru Masuk';
+    if (['resign', 'resigned', 'keluar', 'non aktif', 'nonaktif', 'non-aktif', 'berhenti', 'out'].includes(val)) return 'Resign';
+    if (['aktif', 'active'].includes(val)) return 'Aktif';
+    return 'Aktif'; // fallback aman untuk nilai yang tidak dikenali
   },
 
   // ✅ BARU: Normalisasi nomor telepon ke format +62
@@ -912,7 +919,7 @@ const Handlers = {
       if (!raw.length) return Utils.toast('❌ File kosong!');
 
       const COLS = ['NIP','Nama','NIK','Jabatan','SBU','BKO Jabatan','BKO SBU','Slot BOQ','Slot Real','NIP Baru',
-        'Email','Email Korporat','Tanggal Masuk','Tanggal Keluar','Ukuran Baju','Nomor Telpon'];
+        'Email','Email Korporat','Tanggal Masuk','Tanggal Keluar','Ukuran Baju','Nomor Telpon','Status','Catatan Status'];
       const header = raw[0].map(h => String(h).trim());
 
       AppState.previewUpload = raw.slice(1).map(row => {
@@ -982,7 +989,8 @@ const Handlers = {
       SlotBOQ: r['Slot BOQ'], SlotReal: r['Slot Real'], NIPBaru: r['NIP Baru'],
       Email: r['Email'], EmailKorporat: r['Email Korporat'],
       TglMasuk: r['Tanggal Masuk'], TglKeluar: r['Tanggal Keluar'],
-      UkuranBaju: r['Ukuran Baju'], NoTelp: r['Nomor Telpon']
+      UkuranBaju: r['Ukuran Baju'], NoTelp: r['Nomor Telpon'],
+      Status: r['Status'], StatusCatatan: r['Catatan Status'] // ✅ DIPERBAIKI: sebelumnya tidak dipetakan sama sekali
     }));
     // ✅ DIUBAH: bulkUpload kini mengembalikan statistik (NIP sebagai Primary Key)
     const stats = EmployeeService.bulkUpload(mapped);
