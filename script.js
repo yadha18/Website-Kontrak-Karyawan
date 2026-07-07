@@ -239,6 +239,7 @@ const AppState = {
   slotConfig: {}, // ✅ BARU: salinan CONFIG.SLOT_PER_SBU yang bisa diedit & disimpan
 
   pagination: { page: 1, size: 10 },
+  logPagination: { page: 1, size: 10 }, // ✅ BARU: pagination untuk Review Log Perubahan
   modals: { editTargetId: null, statusTargetId: null },
   slotPanelOpen: {}, // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
 
@@ -602,9 +603,11 @@ const UI = {
     // ✅ BARU: Render tabel slot per SBU & Jabatan
     this.renderSlotJabatan();
 
-    // ✅ BARU: Filter berdasarkan tipe log (dropdown), digabung dengan search teks
+    // ✅ BARU: Filter berdasarkan tipe log (dropdown), rentang tanggal, digabung dengan search teks
     const qLog = (document.getElementById('searchLog')?.value || '').toLowerCase();
     const fLogType = document.getElementById('filterLogType')?.value || '';
+    const fLogDateFrom = document.getElementById('filterLogDateFrom')?.value || ''; // format YYYY-MM-DD
+    const fLogDateTo   = document.getElementById('filterLogDateTo')?.value || '';   // format YYYY-MM-DD
 
     // Isi dropdown tipe log secara dinamis dari data log yang ada
     const elFilterLogType = document.getElementById('filterLogType');
@@ -619,17 +622,36 @@ const UI = {
     const filteredLog = log.filter(c => 
       (!qLog || c.nik.toLowerCase().includes(qLog) || c.nama.toLowerCase().includes(qLog) || 
         c.type.toLowerCase().includes(qLog) || c.oldVal.toLowerCase().includes(qLog) || c.newVal.toLowerCase().includes(qLog)) &&
-      (!fLogType || c.type === fLogType)
+      (!fLogType || c.type === fLogType) &&
+      (!fLogDateFrom || c.ts >= fLogDateFrom) && // ✅ BARU: c.ts berformat YYYY-MM-DD, aman dibandingkan sebagai string
+      (!fLogDateTo || c.ts <= fLogDateTo)        // ✅ BARU
     );
 
     const container = document.getElementById('dash-changes');
+    const elLogPageContainer = document.getElementById('paginationLog');
+
     if (!log.length) {
       container.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Belum ada perubahan</h3><p>Log akan muncul saat ada perubahan data.</p></div>`;
+      if (elLogPageContainer) elLogPageContainer.style.display = 'none';
       return;
     }
     if (!filteredLog.length) {
       container.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><h3>Tidak ada log yang cocok</h3></div>`;
+      if (elLogPageContainer) elLogPageContainer.style.display = 'none';
       return;
+    }
+
+    // ✅ BARU: Pagination untuk Review Log Perubahan (urutan terbaru dulu, lalu dipotong per halaman)
+    const reversedLog = filteredLog.slice().reverse();
+    const logTotalPages = Math.ceil(reversedLog.length / AppState.logPagination.size) || 1;
+    if (AppState.logPagination.page > logTotalPages) AppState.logPagination.page = logTotalPages;
+    const logStartIdx = (AppState.logPagination.page - 1) * AppState.logPagination.size;
+    const paginatedLog = reversedLog.slice(logStartIdx, logStartIdx + AppState.logPagination.size);
+
+    if (elLogPageContainer) {
+      elLogPageContainer.style.display = 'flex';
+      const elTotalLog = document.getElementById('totalLogData');
+      if (elTotalLog) elTotalLog.textContent = reversedLog.length;
     }
 
     container.innerHTML = `
@@ -637,7 +659,7 @@ const UI = {
         <table>
           <thead><tr><th>Tanggal</th><th>NIP</th><th>Nama</th><th>Tipe Perubahan</th><th>Detail Perubahan</th></tr></thead>
           <tbody>
-            ${filteredLog.slice().reverse().map(c => {
+            ${paginatedLog.map(c => {
               const isStatus = c.type === 'status';
               const pillColor = isStatus ? 'purple' : c.type === 'sbu' ? 'blue' : c.type === 'bko jabatan' ? 'green' : c.type === 'bko sbu' ? 'purple' : 'yellow';
               const badge = `<span class="pill pill-${pillColor}">${c.type.toUpperCase()}</span>`;
@@ -653,6 +675,8 @@ const UI = {
           </tbody>
         </table>
       </div>`;
+
+    this.renderLogPagination(logTotalPages);
   },
 
   // ✅ BARU: Render bar chart sederhana (SVG) untuk tipe karyawan bulan berjalan
@@ -824,20 +848,30 @@ const UI = {
     this.renderPagination(totalPages);
   },
 
-  renderPagination(totalPages) {
-    const container = document.getElementById('pageControls');
-    const p = AppState.pagination.page;
-    let html = `<button class="page-btn" ${p === 1 ? 'disabled' : ''} onclick="Handlers.goToPage(${p - 1})">❮</button>`;
-    
-    let start = Math.max(1, p - 2);
-    let end = Math.min(totalPages, p + 2);
+  // ✅ DIUBAH: renderPagination kini generic, bisa dipakai untuk tabel karyawan maupun log
+  renderPaginationGeneric(containerId, page, totalPages, onClickFn) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    let html = `<button class="page-btn" ${page === 1 ? 'disabled' : ''} onclick="${onClickFn}(${page - 1})">❮</button>`;
 
-    if (start > 1) html += `<button class="page-btn" onclick="Handlers.goToPage(1)">1</button>${start > 2 ? '<span>...</span>' : ''}`;
-    for (let i = start; i <= end; i++) html += `<button class="page-btn ${i === p ? 'active' : ''}" onclick="Handlers.goToPage(${i})">${i}</button>`;
-    if (end < totalPages) html += `${end < totalPages - 1 ? '<span>...</span>' : ''}<button class="page-btn" onclick="Handlers.goToPage(${totalPages})">${totalPages}</button>`;
-    
-    html += `<button class="page-btn" ${p === totalPages ? 'disabled' : ''} onclick="Handlers.goToPage(${p + 1})">❯</button>`;
+    let start = Math.max(1, page - 2);
+    let end = Math.min(totalPages, page + 2);
+
+    if (start > 1) html += `<button class="page-btn" onclick="${onClickFn}(1)">1</button>${start > 2 ? '<span>...</span>' : ''}`;
+    for (let i = start; i <= end; i++) html += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="${onClickFn}(${i})">${i}</button>`;
+    if (end < totalPages) html += `${end < totalPages - 1 ? '<span>...</span>' : ''}<button class="page-btn" onclick="${onClickFn}(${totalPages})">${totalPages}</button>`;
+
+    html += `<button class="page-btn" ${page === totalPages ? 'disabled' : ''} onclick="${onClickFn}(${page + 1})">❯</button>`;
     container.innerHTML = html;
+  },
+
+  renderPagination(totalPages) {
+    this.renderPaginationGeneric('pageControls', AppState.pagination.page, totalPages, 'Handlers.goToPage');
+  },
+
+  // ✅ BARU: Render pagination khusus untuk Review Log Perubahan
+  renderLogPagination(totalPages) {
+    this.renderPaginationGeneric('logPageControls', AppState.logPagination.page, totalPages, 'Handlers.goToLogPage');
   },
 
   renderPindahJabatan() {
@@ -908,6 +942,18 @@ const Handlers = {
   resetPageAndRender() { AppState.pagination.page = 1; UI.renderKaryawanTable(); },
   changePageSize() { AppState.pagination.size = parseInt(document.getElementById('pageSize').value); this.resetPageAndRender(); },
   goToPage(p) { AppState.pagination.page = p; UI.renderKaryawanTable(); },
+
+  // ✅ BARU: Handler pagination untuk Review Log Perubahan
+  resetLogPageAndRender() { AppState.logPagination.page = 1; UI.renderDashboard(); },
+  changeLogPageSize() { AppState.logPagination.size = parseInt(document.getElementById('logPageSize').value); this.resetLogPageAndRender(); },
+  goToLogPage(p) { AppState.logPagination.page = p; UI.renderDashboard(); },
+
+  // ✅ BARU: Bersihkan filter rentang tanggal pada Review Log Perubahan
+  resetLogDateFilter() {
+    document.getElementById('filterLogDateFrom').value = '';
+    document.getElementById('filterLogDateTo').value = '';
+    this.resetLogPageAndRender();
+  },
 
   handleFile(e) { if (e.target.files[0]) this.processExcel(e.target.files[0]); },
   processExcel(file) {
@@ -1423,6 +1469,9 @@ window.confirmUpload    = ()     => Handlers.confirmUpload();
 window.renderDashboard  = ()     => UI.renderDashboard();
 window.resetPageAndRender = ()   => Handlers.resetPageAndRender();
 window.changePageSize   = ()     => Handlers.changePageSize();
+window.resetLogPageAndRender = () => Handlers.resetLogPageAndRender(); // ✅ BARU
+window.changeLogPageSize     = () => Handlers.changeLogPageSize();     // ✅ BARU
+window.resetLogDateFilter    = () => Handlers.resetLogDateFilter();    // ✅ BARU
 window.renderPindah     = ()     => UI.renderPindahJabatan();
 window.openModalEdit    = (id)   => Handlers.openEditModal(id);
 window.simpanEditData   = ()     => Handlers.saveEditData();

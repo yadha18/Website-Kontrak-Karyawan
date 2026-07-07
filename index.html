@@ -66,15 +66,36 @@
       <div class="card">
         <div class="flex-between" style="align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
           <div class="card-title" style="margin: 0;">🔄 Review Log Perubahan</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <select id="filterLogType" class="form-control" style="max-width:180px;" onchange="renderDashboard()">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <select id="filterLogType" class="form-control" style="max-width:180px;" onchange="resetLogPageAndRender()">
               <option value="">Semua Tipe</option>
             </select>
-            <input type="text" id="searchLog" placeholder="🔍 Cari log (NIP, Nama, Tipe)..." class="form-control" style="max-width: 250px;" oninput="renderDashboard()">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="date" id="filterLogDateFrom" class="form-control" style="max-width:150px;" onchange="resetLogPageAndRender()" title="Dari tanggal">
+              <span style="color:var(--text2);font-size:12px;">s/d</span>
+              <input type="date" id="filterLogDateTo" class="form-control" style="max-width:150px;" onchange="resetLogPageAndRender()" title="Sampai tanggal">
+              <button class="btn btn-secondary btn-sm" onclick="resetLogDateFilter()" title="Bersihkan filter tanggal">✕</button>
+            </div>
+            <input type="text" id="searchLog" placeholder="🔍 Cari log (NIP, Nama, Tipe)..." class="form-control" style="max-width: 250px;" oninput="resetLogPageAndRender()">
           </div>
         </div>
         <div id="dash-changes">
           <div class="empty"><div class="empty-icon">📋</div><h3>Belum ada perubahan</h3><p>Log akan muncul saat ada perubahan data karyawan.</p></div>
+        </div>
+
+        <!-- ✅ BARU: Kontrol pagination untuk Review Log Perubahan -->
+        <div class="pagination-container" id="paginationLog" style="display: none;">
+          <div class="page-info">
+            Menampilkan
+            <select id="logPageSize" onchange="changeLogPageSize()">
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+            log per halaman. Total: <span id="totalLogData" style="font-weight:600;color:var(--text)">0</span> log.
+          </div>
+          <div class="page-controls" id="logPageControls"></div>
         </div>
       </div>
       <div class="flex-end">
