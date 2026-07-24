@@ -6,6 +6,10 @@
 
 // ─── 1. CONFIGURATION & CONSTANTS ───────────────────────────────────────────
 const CONFIG = {
+  // ✅ DIUBAH: data disimpan di MongoDB lewat Vercel Serverless Functions (folder /api).
+  // Dibiarkan '' karena frontend & API sama-sama di-deploy di domain Vercel yang sama
+  // (same-origin) — fetch('/api/state') otomatis diarahkan ke /api/state.js.
+  API_BASE_URL: '',
   STORAGE_KEYS: {
     KARYAWAN: 'hris_karyawan_v10',
     JABATAN:  'hris_jabatan_v8',
@@ -429,24 +433,72 @@ const Utils = {
 };
 
 // ─── 5. DATABASE SERVICE ────────────────────────────────────────────────────
+// ✅ DIUBAH: DB kini menyimpan & memuat data lewat REST API backend (Express + MongoDB)
+// alih-alih localStorage. Semua data (karyawan, jabatan, log, slotConfig) tersimpan
+// dalam satu dokumen di MongoDB, sehingga bisa diakses dari komputer/user manapun
+// yang terhubung ke backend yang sama.
 const DB = {
-  load() {
-    const cK = localStorage.getItem(CONFIG.STORAGE_KEYS.KARYAWAN);
-    const cJ = localStorage.getItem(CONFIG.STORAGE_KEYS.JABATAN);
-    const cC = localStorage.getItem(CONFIG.STORAGE_KEYS.LOG);
-    const cS = localStorage.getItem(CONFIG.STORAGE_KEYS.SLOT_CONFIG); // ✅ BARU
+  _saving: false,
+  _pendingSave: false,
 
-    AppState.karyawan = cK ? JSON.parse(cK) : [];
-    AppState.log      = cC ? JSON.parse(cC) : [];
-    AppState.jabatan  = cJ ? JSON.parse(cJ) : CONFIG.DEFAULT_JABATAN.map(nama => ({ nama }));
-    // ✅ BARU: Slot config — pakai data tersimpan jika ada, kalau tidak fallback ke default di CONFIG
-    AppState.slotConfig = cS ? JSON.parse(cS) : Utils.deepClone(CONFIG.SLOT_PER_SBU);
+  // Memuat seluruh state dari server saat aplikasi pertama kali dibuka
+  async load() {
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/api/state`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      AppState.karyawan   = Array.isArray(data.karyawan) ? data.karyawan : [];
+      AppState.log        = Array.isArray(data.log) ? data.log : [];
+      AppState.jabatan     = Array.isArray(data.jabatan) && data.jabatan.length
+        ? data.jabatan
+        : CONFIG.DEFAULT_JABATAN.map(nama => ({ nama }));
+      AppState.slotConfig = data.slotConfig && Object.keys(data.slotConfig).length
+        ? data.slotConfig
+        : Utils.deepClone(CONFIG.SLOT_PER_SBU);
+
+      return true;
+    } catch (err) {
+      console.error('Gagal memuat data dari server:', err);
+      Utils.toast('❌ Gagal terhubung ke server database. Data tidak dapat dimuat.', 6000);
+      // Fallback aman agar UI tetap bisa dirender meski server bermasalah
+      AppState.karyawan = AppState.karyawan || [];
+      AppState.log = AppState.log || [];
+      AppState.jabatan = AppState.jabatan && AppState.jabatan.length ? AppState.jabatan : CONFIG.DEFAULT_JABATAN.map(nama => ({ nama }));
+      AppState.slotConfig = AppState.slotConfig && Object.keys(AppState.slotConfig).length ? AppState.slotConfig : Utils.deepClone(CONFIG.SLOT_PER_SBU);
+      return false;
+    }
   },
-  save() {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.KARYAWAN, JSON.stringify(AppState.karyawan));
-    localStorage.setItem(CONFIG.STORAGE_KEYS.JABATAN,  JSON.stringify(AppState.jabatan));
-    localStorage.setItem(CONFIG.STORAGE_KEYS.LOG,      JSON.stringify(AppState.log));
-    localStorage.setItem(CONFIG.STORAGE_KEYS.SLOT_CONFIG, JSON.stringify(AppState.slotConfig)); // ✅ BARU
+
+  // Menyimpan seluruh state ke server (upsert ke MongoDB).
+  // Dipanggil setiap kali ada perubahan data (upload, edit, hapus, dsb).
+  // Menggunakan antrian sederhana supaya panggilan save() yang beruntun
+  // tidak saling tabrakan (request terakhir selalu yang menang).
+  async save() {
+    if (this._saving) { this._pendingSave = true; return; }
+    this._saving = true;
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/api/state`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          karyawan: AppState.karyawan,
+          jabatan: AppState.jabatan,
+          log: AppState.log,
+          slotConfig: AppState.slotConfig
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      console.error('Gagal menyimpan data ke server:', err);
+      Utils.toast('❌ Gagal menyimpan ke database. Periksa koneksi ke server.', 6000);
+    } finally {
+      this._saving = false;
+      if (this._pendingSave) {
+        this._pendingSave = false;
+        this.save();
+      }
+    }
   }
 };
 
@@ -601,8 +653,11 @@ const EmployeeService = {
 
 // ─── 7. UI RENDERER ─────────────────────────────────────────────────────────
 const UI = {
-  init() {
-    DB.load();
+  async init() {
+    // ✅ DIUBAH: DB.load() kini async (mengambil data dari MongoDB via API),
+    // sehingga harus ditunggu (await) sebelum data dirender.
+    Utils.toast('⏳ Memuat data dari server...', 2000);
+    await DB.load();
     // ✅ BARU: Deteksi & ubah otomatis karyawan "Baru Masuk" yang sudah genap 1 bulan menjadi "Aktif"
     const autoUpdatedCount = EmployeeService.autoUpdateNewEmployeeStatus();
     this.renderAll();

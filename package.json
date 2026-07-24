@@ -1,0 +1,13 @@
+{
+  "name": "hris-vercel",
+  "version": "1.0.0",
+  "description": "HRIS dengan MongoDB, di-deploy ke Vercel (frontend static + Serverless Functions di /api).",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "mongodb": "^6.7.0"
+  }
+}
