@@ -291,7 +291,8 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">BKO Jabatan</label>
-        <select class="form-control" id="editBKOJabatan"></select>
+        <select class="form-control" id="editBKOJabatan" onchange="Handlers.syncJabatanFromBKO()"></select>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">ℹ️ Jika diisi, Jabatan akan otomatis mengikuti BKO Jabatan ini setelah disimpan.</div>
       </div>
       <div class="form-group">
         <label class="form-label">BKO SBU</label>
@@ -398,6 +399,20 @@
     <div class="flex-end" style="margin-top: 20px;">
       <button class="btn btn-secondary" onclick="closeModal('modalPindah')">Batal</button>
       <button class="btn btn-primary" onclick="simpanPindah()">Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal Detail Informasi Karyawan + Histori Perpindahan Jabatan -->
+<div class="modal-overlay" id="modalDetailKaryawan">
+  <div class="modal" style="width: 720px;">
+    <div class="modal-header">
+      <h2>👤 Detail Karyawan</h2>
+      <button class="modal-close" onclick="closeModal('modalDetailKaryawan')">✕</button>
+    </div>
+    <div id="detailKaryawanBody"><!-- diisi dinamis oleh JS --></div>
+    <div class="flex-end" style="margin-top: 20px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalDetailKaryawan')">Tutup</button>
     </div>
   </div>
 </div>

@@ -235,6 +235,18 @@ select.form-control { cursor: pointer; }
 .slot-accordion-body .table-wrap { border-left: none; border-right: none; border-bottom: none; }
 .slot-accordion-body table { min-width: unset; }
 
+/* ✅ BARU: DETAIL KARYAWAN MODAL — grid info 2 kolom */
+.detail-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+}
+.detail-info-item { min-width: 0; }
+.detail-info-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+.detail-info-value { font-size: 13.5px; color: var(--text); font-weight: 500; word-break: break-word; }
+.detail-section-title { font-size: 12.5px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; margin: 22px 0 12px; display: flex; align-items: center; gap: 8px; }
+.detail-history-current { border-left: 3px solid var(--accent); }
+
 /* ✅ BARU: EDIT SLOT MODAL ROWS */
 .edit-slot-row {
   display: flex;

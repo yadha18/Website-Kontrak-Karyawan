@@ -319,6 +319,40 @@ const Utils = {
     return JSON.parse(JSON.stringify(obj));
   },
 
+  // ✅ BARU: Hitung jumlah bulan kalender penuh ANTARA dua tanggal (format YYYY-MM-DD).
+  // Dipakai untuk menghitung durasi menjabat di histori perpindahan jabatan.
+  // endStr kosong/null berarti "sampai sekarang". Return null jika startStr tidak valid.
+  monthsBetweenDates(startStr, endStr) {
+    if (!startStr) return null;
+    const start = new Date(startStr);
+    if (isNaN(start.getTime())) return null;
+    const end = endStr ? new Date(endStr) : new Date();
+    if (isNaN(end.getTime())) return null;
+
+    let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+    if (end.getDate() < start.getDate()) months -= 1;
+    return Math.max(0, months);
+  },
+
+  // ✅ BARU: Format jumlah bulan menjadi teks durasi yang mudah dibaca ("2 tahun 3 bulan", dst)
+  formatDurationMonths(months) {
+    if (months === null || months === undefined) return '—';
+    const years = Math.floor(months / 12);
+    const rem = months % 12;
+    if (years > 0 && rem > 0) return `${years} tahun ${rem} bulan`;
+    if (years > 0) return `${years} tahun`;
+    if (months === 0) return '< 1 bulan';
+    return `${months} bulan`;
+  },
+
+  // ✅ BARU: Format tanggal YYYY-MM-DD menjadi format Indonesia yang lebih mudah dibaca
+  formatDateID(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  },
+
   // ✅ BARU: Total slot fix untuk satu SBU = jumlah semua slot jabatan di dalamnya
   slotSBUTotal(sbu) {
     const detail = AppState.slotConfig[sbu];
@@ -648,6 +682,53 @@ const EmployeeService = {
 
     if (count > 0) DB.save();
     return count;
+  },
+
+  // ✅ BARU: Susun histori perpindahan jabatan seorang karyawan dari AppState.log,
+  // beserta durasi menjabat di masing-masing jabatan.
+  // Cara kerja: ambil semua log bertipe 'jabatan' milik karyawan ini (dicocokkan lewat NIP
+  // saat ini — mengikuti konvensi yang sudah dipakai di seluruh log lain), urutkan dari yang
+  // paling lama, lalu rangkai jadi rentang waktu per-jabatan. Posisi pertama dianggap mulai
+  // sejak Tanggal Masuk (kalau ada), posisi terakhir dianggap "sampai sekarang".
+  getJabatanHistory(emp) {
+    const logs = AppState.log
+      .filter(c => c.type === 'jabatan' && c.nik === emp.NIP)
+      .slice()
+      .sort((a, b) => (a.ts === b.ts ? a.id - b.id : a.ts.localeCompare(b.ts)));
+
+    // Belum pernah tercatat pindah jabatan — hanya ada 1 posisi (jabatan saat ini)
+    if (!logs.length) {
+      return [{
+        jabatan: emp.Jabatan || '—',
+        mulai: emp.TglMasuk || null,
+        selesai: null,
+        current: true
+      }];
+    }
+
+    const history = [];
+    const startDate = emp.TglMasuk || logs[0].ts;
+
+    // Posisi pertama: sebelum perubahan tercatat yang paling awal
+    history.push({
+      jabatan: logs[0].oldVal,
+      mulai: startDate,
+      selesai: logs[0].ts,
+      current: false
+    });
+
+    // Setiap perubahan berikutnya menandai posisi baru
+    logs.forEach((c, i) => {
+      const isLast = i === logs.length - 1;
+      history.push({
+        jabatan: c.newVal,
+        mulai: c.ts,
+        selesai: isLast ? null : logs[i + 1].ts,
+        current: isLast
+      });
+    });
+
+    return history;
   }
 };
 
@@ -930,10 +1011,12 @@ const UI = {
     tbody.innerHTML = paginated.map(k => `
       <tr>
         <td style="white-space:nowrap">
-          <button class="btn btn-secondary btn-sm" onclick="Handlers.openEditModal(${k.id})">✏️ Edit</button>
+          <button class="btn btn-secondary btn-sm" onclick="Handlers.openDetailModal(${k.id})">🔍 Detail</button>
+          <button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="Handlers.openEditModal(${k.id})">✏️ Edit</button>
           <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="Handlers.deleteKaryawan(${k.id})">🗑 Hapus</button>
         </td>
-        <td class="mono">${k.NIP}</td><td style="font-weight:500">${k.Nama}</td>
+        <td class="mono">${k.NIP}</td>
+        <td style="font-weight:500;cursor:pointer;color:var(--accent2)" onclick="Handlers.openDetailModal(${k.id})" title="Lihat detail karyawan">${k.Nama}</td>
         <td class="mono">${k.NIK || '—'}</td>
         <td><span class="pill pill-blue">${k.Jabatan}</span></td><td>${k.SBU}</td>
         <td>${k.BKOJabatan}</td><td>${k.BKOSBU}</td><td>${k.SlotBOQ}</td><td>${k.SlotReal}</td>
@@ -1155,6 +1238,72 @@ const Handlers = {
     this.navigate('dashboard');
   },
 
+  // ✅ BARU: Buka modal detail informasi karyawan + histori perpindahan jabatan
+  openDetailModal(id) {
+    const emp = AppState.karyawan.find(k => k.id === id);
+    if (!emp) return;
+
+    const history = EmployeeService.getJabatanHistory(emp);
+    // Tampilkan dari yang paling baru dulu
+    const historyDesc = history.slice().reverse();
+
+    const historyRows = historyDesc.map(h => {
+      const durasiBulan = Utils.monthsBetweenDates(h.mulai, h.selesai);
+      const durasiLabel = Utils.formatDurationMonths(durasiBulan);
+      return `
+        <tr class="${h.current ? 'detail-history-current' : ''}">
+          <td><span class="pill pill-blue">${h.jabatan || '—'}</span>${h.current ? ' <span class="pill pill-green" style="margin-left:4px">Saat Ini</span>' : ''}</td>
+          <td style="font-size:12px;color:var(--text2)">${Utils.formatDateID(h.mulai)}</td>
+          <td style="font-size:12px;color:var(--text2)">${h.current ? '<span style="color:var(--accent2);font-weight:600">Sekarang</span>' : Utils.formatDateID(h.selesai)}</td>
+          <td style="font-weight:600">${durasiLabel}</td>
+        </tr>`;
+    }).join('');
+
+    const infoItem = (label, value) => `
+      <div class="detail-info-item">
+        <div class="detail-info-label">${label}</div>
+        <div class="detail-info-value">${value || '—'}</div>
+      </div>`;
+
+    document.getElementById('detailKaryawanBody').innerHTML = `
+      <div class="card" style="background:var(--surface2);border-color:var(--border2);margin-bottom:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+          <div>
+            <div style="font-size:18px;font-weight:700">${emp.Nama}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px" class="mono">NIP: ${emp.NIP}</div>
+          </div>
+          <div>${Utils.statusPill(emp.Status)}</div>
+        </div>
+        <div class="detail-info-grid">
+          ${infoItem('NIK', `<span class="mono">${emp.NIK}</span>`)}
+          ${infoItem('Jabatan Saat Ini', `<span class="pill pill-blue">${emp.Jabatan}</span>`)}
+          ${infoItem('SBU', emp.SBU)}
+          ${infoItem('Slot BOQ / Real', `${emp.SlotBOQ || '—'} / ${emp.SlotReal || '—'}`)}
+          ${infoItem('BKO Jabatan', emp.BKOJabatan)}
+          ${infoItem('BKO SBU', emp.BKOSBU)}
+          ${infoItem('Email', emp.Email)}
+          ${infoItem('Email Korporat', emp.EmailKorporat)}
+          ${infoItem('No. Telepon', emp.NoTelp)}
+          ${infoItem('Ukuran Baju', emp.UkuranBaju)}
+          ${infoItem('Tanggal Masuk', Utils.formatDateID(emp.TglMasuk))}
+          ${infoItem('Tanggal Keluar', Utils.formatDateID(emp.TglKeluar))}
+          ${infoItem('NIP Baru', emp.NIPBaru)}
+          ${infoItem('Terakhir Update', Utils.formatDateID(emp.TglUpdate))}
+        </div>
+        ${emp.StatusCatatan ? `<div class="info-note" style="margin-top:14px;margin-bottom:0">📝 Catatan Status: ${emp.StatusCatatan}</div>` : ''}
+      </div>
+
+      <div class="detail-section-title">📜 Histori Perpindahan Jabatan</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Jabatan</th><th>Mulai</th><th>Selesai</th><th>Durasi Menjabat</th></tr></thead>
+          <tbody>${historyRows || `<tr><td colspan="4"><div class="empty" style="padding:24px"><h3>Belum ada histori</h3></div></td></tr>`}</tbody>
+        </table>
+      </div>`;
+
+    document.getElementById('modalDetailKaryawan').classList.add('open');
+  },
+
   // ✅ DIUBAH: openEditModal — tambah populate dropdown BKO Jabatan & BKO SBU
   openEditModal(id) {
     AppState.modals.editTargetId = id;
@@ -1211,6 +1360,14 @@ const Handlers = {
     document.getElementById('modalEditData').classList.add('open');
   },
 
+  // ✅ BARU: Saat BKO Jabatan dipilih di form edit, langsung sinkronkan dropdown Jabatan
+  // (agar user melihat perubahan sebelum menyimpan). Aturan final tetap ditegakkan lagi
+  // di saveEditData() supaya konsisten walau user sempat mengubah dropdown Jabatan manual.
+  syncJabatanFromBKO() {
+    const bko = document.getElementById('editBKOJabatan').value;
+    if (bko) document.getElementById('editJabatan').value = bko;
+  },
+
   // ✅ DIUBAH: saveEditData — nilai BKO diambil dari select, di-uppercase via Models.Karyawan
   saveEditData() {
     const NIP  = document.getElementById('editNIP').value.trim();
@@ -1219,12 +1376,17 @@ const Handlers = {
     if (!NIP || !Nama) return Utils.toast('❌ NIP dan Nama wajib diisi!');
     if (!TglMasuk) return Utils.toast('❌ Tanggal Masuk wajib diisi!'); // ✅ BARU: validasi mandatory
 
+    const BKOJabatanValue = document.getElementById('editBKOJabatan').value.toUpperCase();
+    // ✅ BARU: Jika BKO Jabatan diisi, Jabatan resmi mengikuti nilai BKO Jabatan tsb.
+    // Kalau BKO Jabatan dikosongkan, Jabatan tetap mengikuti pilihan di dropdown Jabatan seperti biasa.
+    const JabatanValue = BKOJabatanValue || document.getElementById('editJabatan').value;
+
     const formData = {
       NIP, Nama,
       NIK:           document.getElementById('editNIK').value,               // ✅ BARU
-      Jabatan:       document.getElementById('editJabatan').value,
+      Jabatan:       JabatanValue,
       SBU:           document.getElementById('editSBU').value,
-      BKOJabatan:    document.getElementById('editBKOJabatan').value.toUpperCase(), // ✅ uppercase
+      BKOJabatan:    BKOJabatanValue,
       BKOSBU:        document.getElementById('editBKOSBU').value.toUpperCase(),     // ✅ uppercase
       SlotBOQ:       document.getElementById('editSlotBOQ').value,
       SlotReal:      document.getElementById('editSlotReal').value,
@@ -1262,7 +1424,9 @@ const Handlers = {
         }
         return Utils.toast('❌ Gagal memperbarui data.');
       }
-      Utils.toast(`✅ Data diperbarui!`);
+      Utils.toast(BKOJabatanValue
+        ? `✅ Data diperbarui! Jabatan otomatis disesuaikan mengikuti BKO Jabatan: ${BKOJabatanValue}`
+        : `✅ Data diperbarui!`, BKOJabatanValue ? 5000 : 3000);
     }
 
     UI.closeModal('modalEditData');
