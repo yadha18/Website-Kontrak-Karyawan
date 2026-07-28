@@ -48,6 +48,44 @@
         <h1>Dashboard</h1>
         <p>Ringkasan data karyawan, status, dan perubahan historis.</p>
       </div>
+
+      <!-- ✅ BARU: Skeleton loading — tampil saat data masih diambil dari server, hilang setelah selesai -->
+      <div id="dashboard-skeleton">
+        <div class="stat-grid">
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+        </div>
+        <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+          <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
+        </div>
+        <div class="card">
+          <div class="skeleton skeleton-text" style="width:220px;height:14px;margin-bottom:16px"></div>
+          <div class="skeleton skeleton-block" style="height:180px"></div>
+        </div>
+        <div class="card">
+          <div class="skeleton skeleton-text" style="width:220px;height:14px;margin-bottom:16px"></div>
+          <div class="skeleton skeleton-block" style="height:48px;margin-bottom:8px"></div>
+          <div class="skeleton skeleton-block" style="height:48px;margin-bottom:8px"></div>
+          <div class="skeleton skeleton-block" style="height:48px"></div>
+        </div>
+        <div class="card">
+          <div class="skeleton skeleton-text" style="width:220px;height:14px;margin-bottom:16px"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+        </div>
+      </div>
+
+      <!-- Konten dashboard sesungguhnya — disembunyikan sampai data selesai dimuat dari server -->
+      <div id="dashboard-content" style="display:none;">
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Total Karyawan</div><div class="stat-value accent" id="stat-total">0</div></div>
         <div class="stat-card"><div class="stat-label">🟢 Karyawan Baru</div><div class="stat-value success" id="stat-baru">0</div></div>
@@ -114,6 +152,7 @@
       <div class="flex-end">
         <button class="btn btn-success" onclick="exportExcel()">⬇ Export Excel Terbaru</button>
       </div>
+      </div><!-- /#dashboard-content -->
     </div>
 
     <div class="page" id="page-upload">

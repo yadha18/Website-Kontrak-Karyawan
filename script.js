@@ -729,16 +729,25 @@ const EmployeeService = {
 const UI = {
   async init() {
     // ✅ DIUBAH: DB.load() kini async (mengambil data dari MongoDB via API),
-    // sehingga harus ditunggu (await) sebelum data dirender.
-    Utils.toast('⏳ Memuat data dari server...', 2000);
+    // sehingga harus ditunggu (await) sebelum data dirender. Selama menunggu,
+    // dashboard menampilkan skeleton loading alih-alih toast saja.
     await DB.load();
     // ✅ BARU: Deteksi & ubah otomatis karyawan "Baru Masuk" yang sudah genap 1 bulan menjadi "Aktif"
     const autoUpdatedCount = EmployeeService.autoUpdateNewEmployeeStatus();
     this.renderAll();
     this.setupUploadZone();
+    this.hideDashboardSkeleton(); // ✅ BARU: data selesai dirender, ganti skeleton dengan konten asli
     if (autoUpdatedCount > 0) {
       Utils.toast(`🔄 ${autoUpdatedCount} karyawan otomatis diubah dari "Baru Masuk" menjadi "Aktif" (sudah genap 1 bulan)`, 5000);
     }
+  },
+
+  // ✅ BARU: Sembunyikan skeleton dashboard & tampilkan konten asli setelah data siap
+  hideDashboardSkeleton() {
+    const skeleton = document.getElementById('dashboard-skeleton');
+    const content  = document.getElementById('dashboard-content');
+    if (skeleton) skeleton.style.display = 'none';
+    if (content) content.style.display = '';
   },
 
   renderAll() {
