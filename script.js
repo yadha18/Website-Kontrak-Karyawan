@@ -131,101 +131,13 @@ const CONFIG = {
   ],
 
   // ✅ BARU: Opsi dropdown ukuran baju
-  UKURAN_BAJU: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
+  UKURAN_BAJU: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL']
 
-  // ✅ BARU: Total slot karyawan keseluruhan (fix/ditetapkan)
-  TOTAL_SLOT_KARYAWAN: 264,
-
-  // ✅ BARU: Rincian slot per SBU dan Jabatan (fix/ditetapkan)
-  // Struktur: { [SBU]: { total: number, jabatan: { [NamaJabatan]: jumlahSlot } } }
-  SLOT_PER_SBU: {
-    'BALI & NUSA TENGGARA': {
-      total: 21,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 4, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
-        'COLLECTION SBU': 7, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'JAKARTA & BANTEN': {
-      total: 26,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 7, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1, 'ADMINISTRASI SALES': 1,
-        'COLLECTION SBU': 8, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'JAWA BAGIAN BARAT': {
-      total: 26,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 9, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1, 'ADMINISTRASI SALES': 1,
-        'COLLECTION SBU': 6, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'JAWA BAGIAN TENGAH': {
-      total: 26,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 10, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
-        'COLLECTION SBU': 6, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'JAWA BAGIAN TIMUR': {
-      total: 24,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 7, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
-        'COLLECTION SBU': 7, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'KALIMANTAN': {
-      total: 22,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 6, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
-        'COLLECTION SBU': 6, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'PUSAT': {
-      total: 26,
-      jabatan: {
-        'ADMINISTRASI SALES': 13, 'COLLECTION PUSAT': 9,
-        'DATA ANALYST & DESIGN ENGINEER': 2, 'OFFICER MARKETING': 2
-      }
-    },
-    'SULAWESI & INDONESIA TIMUR': {
-      total: 20,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 7, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'COLLECTION SBU': 5, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'SUMATERA BAGIAN SELATAN': {
-      total: 24,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 8, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
-        'COLLECTION SBU': 6, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'SUMATERA BAGIAN TENGAH': {
-      total: 23,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 6, 'ACCOUNT EXECUTIVE GRADE 2': 4,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
-        'COLLECTION SBU': 7, 'OFFICER MARKETING': 2, 'VALIDASI SBU': 2
-      }
-    },
-    'SUMATERA BAGIAN UTARA': {
-      total: 25,
-      jabatan: {
-        'ACCOUNT EXECUTIVE GRADE 1': 15, 'ACCOUNT EXECUTIVE GRADE 2': 2,
-        'ACCOUNT MANAGER JUNIOR': 1, 'ACCOUNT MANAGER SENIOR': 1,
-        'COLLECTION SBU': 4, 'OFFICER MARKETING': 2
-      }
-    }
-  }
+  // ✅ DIHAPUS: SLOT_PER_SBU & TOTAL_SLOT_KARYAWAN statis tidak dipakai lagi.
+  // Slot Jabatan per SBU sekarang dibangun otomatis dari data Excel yang
+  // diupload pertama kali (lihat EmployeeService.buildSlotConfigFromData),
+  // lalu tersimpan di AppState.slotConfig (bisa diedit manual oleh superadmin
+  // lewat modal "Edit Slot").
 };
 
 const STATUS_DEF = {
@@ -240,7 +152,7 @@ const AppState = {
   jabatan: [],
   log: [],
   previewUpload: [],
-  slotConfig: {}, // ✅ BARU: salinan CONFIG.SLOT_PER_SBU yang bisa diedit & disimpan
+  slotConfig: {}, // ✅ DIUBAH: dibangun otomatis dari Excel yang diupload pertama kali, bisa diedit & disimpan
 
   pagination: { page: 1, size: 10 },
   logPagination: { page: 1, size: 10 }, // ✅ BARU: pagination untuk Review Log Perubahan
@@ -294,6 +206,30 @@ const Models = {
 };
 
 // ─── 4. UTILITIES ───────────────────────────────────────────────────────────
+// ─── THEME SERVICE ───────────────────────────────────────────────────────────
+// ✅ BARU: Toggle Light Mode / Dark Mode. Preferensi tema disimpan di localStorage
+// browser (bukan MongoDB) karena ini murni preferensi tampilan per-perangkat,
+// bukan data aplikasi yang perlu dibagi antar user/komputer.
+const ThemeService = {
+  KEY: 'hris_theme',
+
+  init() {
+    // data-theme sudah di-set lebih awal oleh inline script di <head> (mencegah kedipan tema).
+    // Posisi thumb & ikon switch sepenuhnya mengikuti atribut data-theme lewat CSS,
+    // jadi tidak perlu manipulasi DOM tambahan di sini.
+  },
+
+  current() {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  },
+
+  toggle() {
+    const next = this.current() === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem(this.KEY, next); } catch (e) {}
+  }
+};
+
 const Utils = {
   getTodayDate() {
     const d = new Date();
@@ -358,6 +294,17 @@ const Utils = {
     const detail = AppState.slotConfig[sbu];
     if (!detail || !detail.jabatan) return 0;
     return Object.values(detail.jabatan).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  },
+
+  // ✅ BARU: Ambil slot fix (Slot BOQ) untuk kombinasi SBU + Jabatan dari slotConfig saat ini.
+  // Dipakai saat export supaya "Slot BOQ" yang diexport selalu mengikuti Slot Jabatan per SBU
+  // yang berlaku sekarang (termasuk kalau sudah diedit superadmin), bukan nilai lama per-baris
+  // karyawan yang mungkin sudah usang. Return null kalau kombinasinya tidak ditemukan.
+  getSlotFixJabatan(sbu, jabatan) {
+    const detail = AppState.slotConfig[sbu];
+    if (!detail || !detail.jabatan) return null;
+    const val = detail.jabatan[jabatan];
+    return (val === undefined || val === null || val === '') ? null : val;
   },
 
   // ✅ BARU: Total slot fix keseluruhan (dihitung dinamis dari slotConfig, bukan angka statis)
@@ -487,9 +434,12 @@ const DB = {
       AppState.jabatan     = Array.isArray(data.jabatan) && data.jabatan.length
         ? data.jabatan
         : CONFIG.DEFAULT_JABATAN.map(nama => ({ nama }));
+      // ✅ DIUBAH: tidak lagi fallback ke CONFIG.SLOT_PER_SBU yang statis.
+      // Kalau belum ada slotConfig tersimpan, biarkan kosong — akan otomatis
+      // dibangun dari data Excel pertama kali yang diupload (lihat bulkUpload()).
       AppState.slotConfig = data.slotConfig && Object.keys(data.slotConfig).length
         ? data.slotConfig
-        : Utils.deepClone(CONFIG.SLOT_PER_SBU);
+        : {};
 
       return true;
     } catch (err) {
@@ -499,7 +449,7 @@ const DB = {
       AppState.karyawan = AppState.karyawan || [];
       AppState.log = AppState.log || [];
       AppState.jabatan = AppState.jabatan && AppState.jabatan.length ? AppState.jabatan : CONFIG.DEFAULT_JABATAN.map(nama => ({ nama }));
-      AppState.slotConfig = AppState.slotConfig && Object.keys(AppState.slotConfig).length ? AppState.slotConfig : Utils.deepClone(CONFIG.SLOT_PER_SBU);
+      AppState.slotConfig = AppState.slotConfig && Object.keys(AppState.slotConfig).length ? AppState.slotConfig : {};
       return false;
     }
   },
@@ -629,19 +579,62 @@ const EmployeeService = {
   },
 
   // ✅ DIUBAH: bulkUpload kini menerapkan Primary Key NIP — hanya data baru (NIP belum pernah ada) yang ditambahkan
+  // ✅ BARU: Bangun Slot Jabatan per SBU secara dinamis dari data karyawan yang diupload,
+  // menggantikan variabel statis CONFIG.SLOT_PER_SBU yang lama.
+  // Logikanya: kolom "Slot BOQ" di Excel merepresentasikan jumlah slot fix untuk
+  // kombinasi SBU + Jabatan tsb, jadi kita ambil nilai SlotBOQ per kombinasi
+  // (memakai nilai terbesar yang ditemukan, untuk berjaga-jaga kalau ada baris yang
+  // kebetulan kosong/0), lalu total per SBU = jumlah slot semua jabatan di dalamnya.
+  buildSlotConfigFromData(employees) {
+    const config = {};
+
+    employees.forEach(emp => {
+      const sbu = emp.SBU;
+      const jab = emp.Jabatan;
+      if (!sbu || !jab) return;
+
+      const slotBOQ = Number(emp.SlotBOQ) || 0;
+      if (!config[sbu]) config[sbu] = { total: 0, jabatan: {} };
+
+      const current = config[sbu].jabatan[jab] || 0;
+      config[sbu].jabatan[jab] = Math.max(current, slotBOQ);
+    });
+
+    Object.values(config).forEach(detail => {
+      detail.total = Object.values(detail.jabatan).reduce((sum, v) => sum + v, 0);
+    });
+
+    return config;
+  },
+
   bulkUpload(dataArray) {
+    // ✅ BARU: tandai apakah ini upload pertama (belum ada karyawan sama sekali
+    // sebelum upload ini) — dipakai untuk menentukan apakah Slot Jabatan per SBU
+    // perlu dibangun otomatis dari data Excel ini.
+    const isFirstUpload = AppState.karyawan.length === 0;
+
     const classified = this.classifyUploadRows(dataArray);
     const toInsert = classified.filter(r => r.__uploadStatus === 'new');
 
     const newEmployees = toInsert.map(data => Models.Karyawan(data));
     AppState.karyawan = AppState.karyawan.concat(newEmployees);
 
+    // ✅ BARU: Kalau ini upload pertama, bangun Slot Jabatan per SBU dari data
+    // yang baru saja diupload — bukan lagi dari CONFIG.SLOT_PER_SBU yang statis.
+    // Upload berikutnya (menambah karyawan baru ke data yang sudah ada) TIDAK
+    // menimpa slotConfig, supaya penyesuaian manual superadmin lewat "Edit Slot"
+    // tidak hilang begitu saja.
+    if (isFirstUpload && newEmployees.length > 0) {
+      AppState.slotConfig = this.buildSlotConfigFromData(newEmployees);
+    }
+
     const stats = {
       total: classified.length,
       added: toInsert.length,
       duplicateExisting: classified.filter(r => r.__uploadStatus === 'duplicate_existing').length,
       duplicateInFile: classified.filter(r => r.__uploadStatus === 'duplicate_infile').length,
-      invalid: classified.filter(r => r.__uploadStatus === 'invalid').length
+      invalid: classified.filter(r => r.__uploadStatus === 'invalid').length,
+      slotConfigBuilt: isFirstUpload && newEmployees.length > 0 // ✅ BARU
     };
 
     if (stats.total > 0) {
@@ -911,6 +904,17 @@ const UI = {
   renderSlotJabatan() {
     const elSlot = document.getElementById('slot-jabatan-table');
     if (!elSlot) return;
+
+    // ✅ BARU: Belum ada data slot sama sekali (belum pernah upload Excel) — tampilkan empty state
+    if (!Object.keys(AppState.slotConfig).length) {
+      elSlot.innerHTML = `
+        <div class="empty">
+          <div class="empty-icon">📊</div>
+          <h3>Belum ada Slot Jabatan</h3>
+          <p>Slot Jabatan per SBU akan otomatis terbentuk mengikuti kolom "Slot BOQ" pada file Excel yang pertama kali Anda upload.</p>
+        </div>`;
+      return;
+    }
 
     const aktifKaryawan = AppState.karyawan.filter(k => k.Status === 'Aktif' || k.Status === 'Baru Masuk');
 
@@ -1229,10 +1233,13 @@ const Handlers = {
     this.cancelUpload();
 
     const skippedTotal = stats.duplicateExisting + stats.duplicateInFile + stats.invalid;
+    const slotNote = stats.slotConfigBuilt
+      ? ' 📊 Slot Jabatan per SBU otomatis dibangun mengikuti data Slot BOQ di file ini.'
+      : '';
     if (skippedTotal > 0) {
-      Utils.toast(`✅ ${stats.added} data baru ditambahkan. ⚠ ${skippedTotal} baris dilewati (duplikat/tidak valid).`, 5000);
+      Utils.toast(`✅ ${stats.added} data baru ditambahkan. ⚠ ${skippedTotal} baris dilewati (duplikat/tidak valid).${slotNote}`, 6000);
     } else {
-      Utils.toast(`✅ ${stats.added} karyawan baru berhasil disimpan`);
+      Utils.toast(`✅ ${stats.added} karyawan baru berhasil disimpan.${slotNote}`, stats.slotConfigBuilt ? 6000 : 3000);
     }
     this.resetPageAndRender();
     this.navigate('dashboard');
@@ -1682,15 +1689,22 @@ const Handlers = {
     const sourceData = data || AppState.karyawan;
     if (!sourceData.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
 
-    const rows = sourceData.map(k => ({
-      'NIP': k.NIP, 'Nama': k.Nama, 'NIK': k.NIK, 'Jabatan': k.Jabatan, 'SBU': k.SBU,
-      'BKO Jabatan': k.BKOJabatan, 'BKO SBU': k.BKOSBU, 'Slot BOQ': k.SlotBOQ, 
-      'Slot Real': k.SlotReal, 'NIP Baru': k.NIPBaru,
-      'Email': k.Email, 'Email Korporat': k.EmailKorporat,
-      'Tanggal Masuk': k.TglMasuk, 'Tanggal Keluar': k.TglKeluar,
-      'Ukuran Baju': k.UkuranBaju, 'Nomor Telpon': k.NoTelp,
-      'Tanggal Update': k.TglUpdate, 'Status': k.Status, 'Catatan Status': k.StatusCatatan
-    }));
+    const rows = sourceData.map(k => {
+      // ✅ BARU: "Slot BOQ" yang diexport mengikuti Slot Fix (slotConfig) SBU+Jabatan saat ini.
+      // Kalau kombinasinya belum tercatat di slotConfig (mis. jabatan/SBU baru yang belum
+      // pernah di-set), fallback ke nilai SlotBOQ yang tersimpan di data karyawan itu sendiri.
+      const slotFix = Utils.getSlotFixJabatan(k.SBU, k.Jabatan);
+      return {
+        'NIP': k.NIP, 'Nama': k.Nama, 'NIK': k.NIK, 'Jabatan': k.Jabatan, 'SBU': k.SBU,
+        'BKO Jabatan': k.BKOJabatan, 'BKO SBU': k.BKOSBU,
+        'Slot BOQ': slotFix !== null ? slotFix : k.SlotBOQ,
+        'Slot Real': k.SlotReal, 'NIP Baru': k.NIPBaru,
+        'Email': k.Email, 'Email Korporat': k.EmailKorporat,
+        'Tanggal Masuk': k.TglMasuk, 'Tanggal Keluar': k.TglKeluar,
+        'Ukuran Baju': k.UkuranBaju, 'Nomor Telpon': k.NoTelp,
+        'Tanggal Update': k.TglUpdate, 'Status': k.Status, 'Catatan Status': k.StatusCatatan
+      };
+    });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Data Karyawan');
@@ -1760,4 +1774,5 @@ window.saveEditSlot          = ()    => Handlers.saveEditSlot();              //
 window.exportFiltered        = ()    => Handlers.exportFiltered();            // ✅ BARU
 
 // Initialize application
+ThemeService.init();
 UI.init();

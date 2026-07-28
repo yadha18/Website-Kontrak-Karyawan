@@ -18,6 +18,30 @@
   --mono:      'JetBrains Mono', monospace;
 }
 
+/* ✅ BARU: LIGHT MODE — override variabel warna saat data-theme="light" */
+:root[data-theme="light"] {
+  --bg:        #f4f5f9;
+  --surface:   #ffffff;
+  --surface2:  #eef0f6;
+  --border:    #e1e3ec;
+  --border2:   #cdd1e0;
+  --accent:    #3b63e0;
+  --accent2:   #2f52c4;
+  --success:   #16a34a;
+  --warning:   #d97706;
+  --danger:    #dc2626;
+  --purple:    #7c3aed;
+  --text:      #1a1d2b;
+  --text2:     #5c6178;
+  --text3:     #9498ab;
+}
+
+body, .card, .stat-card, .modal, .sidebar, .topbar, .nav-item, .btn, th, td,
+.upload-zone, .status-opt, .jabatan-item, .edit-slot-row, .slot-accordion-item,
+.slot-accordion-header {
+  transition: background-color .2s, border-color .2s, color .2s;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
 
@@ -26,6 +50,40 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .topbar-logo span { color: var(--text2); font-weight: 400; }
 .topbar-sep { flex: 1; }
 .badge-count { background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; display: none; }
+
+/* ✅ DIUBAH: THEME TOGGLE — rounded switch (gaya iOS) */
+.theme-switch {
+  position: relative;
+  width: 52px;
+  height: 27px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  transition: background-color .2s, border-color .2s;
+}
+.theme-switch:hover { border-color: var(--accent); }
+.theme-switch-icon { font-size: 12px; line-height: 1; opacity: .7; position: relative; z-index: 1; }
+.theme-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  transition: left .2s ease, background-color .2s ease;
+}
+:root[data-theme="light"] .theme-switch-thumb {
+  left: calc(100% - 23px);
+  background: var(--warning);
+}
 
 .layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 56px); }
 

@@ -6,6 +6,16 @@
 <title>HRIS · Manajemen Jabatan Karyawan</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="style.css">
+<script>
+  // ✅ BARU: Terapkan tema tersimpan SEBELUM halaman dirender, supaya tidak ada "kedipan" tema salah
+  (function() {
+    try {
+      const saved = localStorage.getItem('hris_theme');
+      const theme = saved === 'light' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
 
@@ -13,6 +23,11 @@
   <div class="topbar-logo">HRIS <span>/ Jabatan Karyawan</span></div>
   <div class="topbar-sep"></div>
   <span class="badge-count" id="changesBadge">0 perubahan</span>
+  <button class="theme-switch" id="themeToggle" onclick="ThemeService.toggle()" title="Ganti Light/Dark Mode" aria-label="Toggle Light/Dark Mode">
+    <span class="theme-switch-icon">🌙</span>
+    <span class="theme-switch-icon">☀️</span>
+    <span class="theme-switch-thumb"></span>
+  </button>
 </div>
 
 <div class="layout">
