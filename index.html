@@ -158,7 +158,7 @@
     <div class="page" id="page-upload">
       <div class="page-header">
         <h1>Upload Data Karyawan</h1>
-        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email, Email Korporat, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.</p>
+        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.</p>
         <p style="color:var(--text2);margin-top:4px;">ℹ️ Kolom <strong>Status</strong> menerima: "Baru Masuk", "Aktif", atau "Resign" (tidak peka huruf besar/kecil). Jika kosong, akan otomatis diisi "Aktif".</p>
         <p style="color:var(--warning);margin-top:4px;">🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> Baris dengan NIP yang sudah terdaftar di sistem akan otomatis dilewati saat upload — hanya data dengan NIP baru yang akan ditambahkan.</p>
       </div>
@@ -235,7 +235,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>NIK</th><th>Jabatan</th><th>SBU</th><th>BKO Jabatan</th><th>BKO SBU</th><th>Slot BOQ</th><th>Slot Real</th><th>NIP Baru</th><th>Email Pribadi</th><th>Email Korporat</th><th>No. Telp</th><th>Ukuran Baju</th><th>Tgl Masuk</th><th>Tgl Keluar</th><th>Tgl Update</th><th>Status</th></tr>
+            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>NIK</th><th>Jabatan</th><th>SBU</th><th>BKO Jabatan</th><th>BKO SBU</th><th>Slot BOQ</th><th>Slot Real</th><th>NIP Baru</th><th>Email Pribadi</th><th>Email Korporat</th><th>Nama Akun ICRM</th><th>No. Telp</th><th>Ukuran Baju</th><th>Tgl Masuk</th><th>Tgl Keluar</th><th>Tgl Update</th><th>Status</th></tr>
           </thead>
           <tbody id="karyawanBody"></tbody>
         </table>
@@ -376,12 +376,19 @@
       </div>
     </div>
 
-    <!-- ✅ BARU: Email Korporat -->
+    <!-- ✅ BARU: Email Korporat & Nama Akun ICRM -->
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Email Korporat</label>
         <input type="email" class="form-control" id="editEmailKorporat" placeholder="nama@perusahaan.co.id">
       </div>
+      <div class="form-group">
+        <label class="form-label">Nama Akun ICRM</label>
+        <input type="text" class="form-control" id="editNamaAkunICRM" placeholder="Nama akun di sistem ICRM">
+      </div>
+    </div>
+
+    <div class="form-row">
       <div class="form-group">
         <label class="form-label">Nomor Telpon Aktif</label>
         <input type="text" class="form-control" id="editNoTelp" placeholder="+62812xxxxxxx"

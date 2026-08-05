@@ -182,6 +182,7 @@ const Models = {
       NIPBaru:       String(data.NIPBaru || '').trim(),
       Email:         String(data.Email || '').trim(),                        // Email Pribadi (lama)
       EmailKorporat: String(data.EmailKorporat || '').trim(),                // ✅ BARU
+      NamaAkunICRM:  String(data.NamaAkunICRM || '').trim(),                 // ✅ BARU
       TglMasuk:      String(data.TglMasuk || '').trim(),                     // ✅ BARU
       TglKeluar:     String(data.TglKeluar || '').trim(),                    // ✅ BARU
       UkuranBaju:    String(data.UkuranBaju || '').trim().toUpperCase(),     // ✅ BARU
@@ -1036,6 +1037,7 @@ const UI = {
         <td class="mono">${k.NIPBaru}</td>
         <td>${k.Email || '—'}</td>
         <td>${k.EmailKorporat || '—'}</td>
+        <td>${k.NamaAkunICRM || '—'}</td>
         <td>${k.NoTelp || '—'}</td>
         <td>${k.UkuranBaju ? `<span class="pill pill-gray">${k.UkuranBaju}</span>` : '—'}</td>
         <td style="font-size:12px;color:var(--text2)">${k.TglMasuk || '—'}</td>
@@ -1164,7 +1166,7 @@ const Handlers = {
       if (!raw.length) return Utils.toast('❌ File kosong!');
 
       const COLS = ['NIP','Nama','NIK','Jabatan','SBU','BKO Jabatan','BKO SBU','Slot BOQ','Slot Real','NIP Baru',
-        'Email','Email Korporat','Tanggal Masuk','Tanggal Keluar','Ukuran Baju','Nomor Telpon','Status','Catatan Status'];
+        'Email','Email Korporat','Nama Akun ICRM','Tanggal Masuk','Tanggal Keluar','Ukuran Baju','Nomor Telpon','Status','Catatan Status'];
       const header = raw[0].map(h => String(h).trim());
 
       AppState.previewUpload = raw.slice(1).map(row => {
@@ -1233,6 +1235,7 @@ const Handlers = {
       BKOJabatan: r['BKO Jabatan'], BKOSBU: r['BKO SBU'],
       SlotBOQ: r['Slot BOQ'], SlotReal: r['Slot Real'], NIPBaru: r['NIP Baru'],
       Email: r['Email'], EmailKorporat: r['Email Korporat'],
+      NamaAkunICRM: r['Nama Akun ICRM'],
       TglMasuk: r['Tanggal Masuk'], TglKeluar: r['Tanggal Keluar'],
       UkuranBaju: r['Ukuran Baju'], NoTelp: r['Nomor Telpon'],
       Status: r['Status'], StatusCatatan: r['Catatan Status'] // ✅ DIPERBAIKI: sebelumnya tidak dipetakan sama sekali
@@ -1299,6 +1302,7 @@ const Handlers = {
           ${infoItem('BKO SBU', emp.BKOSBU)}
           ${infoItem('Email', emp.Email)}
           ${infoItem('Email Korporat', emp.EmailKorporat)}
+          ${infoItem('Nama Akun ICRM', emp.NamaAkunICRM)}
           ${infoItem('No. Telepon', emp.NoTelp)}
           ${infoItem('Ukuran Baju', emp.UkuranBaju)}
           ${infoItem('Tanggal Masuk', Utils.formatDateID(emp.TglMasuk))}
@@ -1366,6 +1370,7 @@ const Handlers = {
     document.getElementById('editNIPBaru').value      = emp.NIPBaru;
     document.getElementById('editEmail').value        = emp.Email;
     document.getElementById('editEmailKorporat').value= emp.EmailKorporat || '';               // ✅ BARU
+    document.getElementById('editNamaAkunICRM').value = emp.NamaAkunICRM || '';                // ✅ BARU
     document.getElementById('editTglMasuk').value     = emp.TglMasuk || '';                    // ✅ BARU
     document.getElementById('editTglKeluar').value    = emp.TglKeluar || '';                   // ✅ BARU
     document.getElementById('editUkuranBaju').value   = emp.UkuranBaju || '';                  // ✅ BARU
@@ -1409,6 +1414,7 @@ const Handlers = {
       NIPBaru:       document.getElementById('editNIPBaru').value,
       Email:         document.getElementById('editEmail').value,
       EmailKorporat: document.getElementById('editEmailKorporat').value,     // ✅ BARU
+      NamaAkunICRM:  document.getElementById('editNamaAkunICRM').value,      // ✅ BARU
       TglMasuk,                                                              // ✅ DIUBAH: kini wajib diisi
       TglKeluar:     document.getElementById('editTglKeluar').value,         // ✅ BARU
       UkuranBaju:    document.getElementById('editUkuranBaju').value,        // ✅ BARU
@@ -1708,7 +1714,7 @@ const Handlers = {
         'BKO Jabatan': k.BKOJabatan, 'BKO SBU': k.BKOSBU,
         'Slot BOQ': slotFix !== null ? slotFix : k.SlotBOQ,
         'Slot Real': k.SlotReal, 'NIP Baru': k.NIPBaru,
-        'Email': k.Email, 'Email Korporat': k.EmailKorporat,
+        'Email': k.Email, 'Email Korporat': k.EmailKorporat, 'Nama Akun ICRM': k.NamaAkunICRM,
         'Tanggal Masuk': k.TglMasuk, 'Tanggal Keluar': k.TglKeluar,
         'Ukuran Baju': k.UkuranBaju, 'Nomor Telpon': k.NoTelp,
         'Tanggal Update': k.TglUpdate, 'Status': k.Status, 'Catatan Status': k.StatusCatatan
