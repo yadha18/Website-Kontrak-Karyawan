@@ -1433,7 +1433,7 @@ const Handlers = {
     const Nama = document.getElementById('editNama').value.trim();
     const TglMasuk = document.getElementById('editTglMasuk').value;
     if (!NIP || !Nama) return Utils.toast('❌ NIP dan Nama wajib diisi!');
-    if (!TglMasuk) return Utils.toast('❌ Tanggal Masuk wajib diisi!'); // ✅ BARU: validasi mandatory
+    // if (!TglMasuk) return Utils.toast('❌ Tanggal Masuk wajib diisi!'); // ✅ BARU: validasi mandatory
 
     const BKOJabatanValue = document.getElementById('editBKOJabatan').value.toUpperCase();
     // ✅ BARU: Jika BKO Jabatan diisi, Jabatan resmi mengikuti nilai BKO Jabatan tsb.
