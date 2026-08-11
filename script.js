@@ -169,7 +169,7 @@ const AppState = {
 const Models = {
   Karyawan(data = {}) {
     return {
-      id:            data.id || Date.now() + Math.random(),
+      id:            data.id || Utils.generateId(),
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
       NIK:           String(data.NIK || '').trim(),                          // ✅ BARU
@@ -196,7 +196,7 @@ const Models = {
 
   LogChange(nik, nama, type, oldVal, newVal, catatan = '') {
     return {
-      id: Date.now() + Math.random(),
+      id: Utils.generateId(),
       ts: Utils.getTodayDate(),
       nik, nama, type,
       oldVal: oldVal || '-',
@@ -232,6 +232,19 @@ const ThemeService = {
 };
 
 const Utils = {
+  // ✅ BARU: Generator ID unik yang aman dipanggil berkali-kali dengan sangat cepat
+  // (mis. saat bulk upload ratusan baris dalam satu event loop). Menggantikan
+  // `Date.now() + Math.random()` yang lama — pendekatan itu bisa menghasilkan ID
+  // DUPLIKAT karena presisi desimal JavaScript terbatas (~15-17 digit signifikan)
+  // ketika sebuah pecahan acak ditambahkan ke angka timestamp yang sudah 13 digit,
+  // sehingga bagian desimalnya bisa terpotong dan bertabrakan antar baris yang dibuat
+  // di milidetik yang sama. Ini adalah penyebab bug "detail/edit menampilkan karyawan
+  // lain" — counter monotonic di bawah ini menjamin setiap ID selalu unik & bertambah.
+  _idCounter: Date.now(),
+  generateId() {
+    this._idCounter += 1;
+    return this._idCounter;
+  },
   getTodayDate() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -489,6 +502,24 @@ const DB = {
 
 // ─── 6. BUSINESS LOGIC (SERVICES) ───────────────────────────────────────────
 const EmployeeService = {
+  // ✅ BARU: Perbaiki otomatis ID karyawan yang kadung DUPLIKAT dari bug generator ID lama
+  // (Date.now() + Math.random() yang presisinya bisa bertabrakan saat bulk upload).
+  // ID duplikat inilah yang menyebabkan modal Detail/Edit salah menampilkan data karyawan
+  // lain. Dipanggil sekali saat aplikasi dibuka; baris pertama dari tiap ID yang duplikat
+  // dibiarkan, baris-baris berikutnya diberi ID baru yang unik.
+  repairDuplicateIds() {
+    const seen = new Set();
+    let fixedCount = 0;
+    AppState.karyawan.forEach(k => {
+      if (seen.has(k.id)) {
+        k.id = Utils.generateId();
+        fixedCount++;
+      }
+      seen.add(k.id);
+    });
+    return fixedCount;
+  },
+
   // ✅ BARU: NIP diperlakukan sebagai Primary Key — cek apakah NIP sudah dipakai karyawan lain
   // excludeId dipakai saat mengedit data yang sudah ada (supaya tidak bentrok dengan dirinya sendiri)
   nipExists(nip, excludeId = null) {
@@ -733,11 +764,18 @@ const UI = {
     // sehingga harus ditunggu (await) sebelum data dirender. Selama menunggu,
     // dashboard menampilkan skeleton loading alih-alih toast saja.
     await DB.load();
+    // ✅ BARU: Perbaiki otomatis ID karyawan yang kadung duplikat (bug lama),
+    // yang menyebabkan modal Detail/Edit salah menampilkan data karyawan lain.
+    const fixedIdCount = EmployeeService.repairDuplicateIds();
     // ✅ BARU: Deteksi & ubah otomatis karyawan "Baru Masuk" yang sudah genap 1 bulan menjadi "Aktif"
     const autoUpdatedCount = EmployeeService.autoUpdateNewEmployeeStatus();
     this.renderAll();
     this.setupUploadZone();
     this.hideDashboardSkeleton(); // ✅ BARU: data selesai dirender, ganti skeleton dengan konten asli
+    if (fixedIdCount > 0) {
+      DB.save(); // simpan perbaikan ID ke MongoDB supaya tidak terjadi lagi di kunjungan berikutnya
+      Utils.toast(`🔧 ${fixedIdCount} data karyawan dengan ID duplikat berhasil diperbaiki otomatis.`, 5000);
+    }
     if (autoUpdatedCount > 0) {
       Utils.toast(`🔄 ${autoUpdatedCount} karyawan otomatis diubah dari "Baru Masuk" menjadi "Aktif" (sudah genap 1 bulan)`, 5000);
     }
@@ -1395,7 +1433,7 @@ const Handlers = {
     const Nama = document.getElementById('editNama').value.trim();
     const TglMasuk = document.getElementById('editTglMasuk').value;
     if (!NIP || !Nama) return Utils.toast('❌ NIP dan Nama wajib diisi!');
-    // if (!TglMasuk) return Utils.toast('❌ Tanggal Masuk wajib diisi!'); // ✅ BARU: validasi mandatory
+    if (!TglMasuk) return Utils.toast('❌ Tanggal Masuk wajib diisi!'); // ✅ BARU: validasi mandatory
 
     const BKOJabatanValue = document.getElementById('editBKOJabatan').value.toUpperCase();
     // ✅ BARU: Jika BKO Jabatan diisi, Jabatan resmi mengikuti nilai BKO Jabatan tsb.
