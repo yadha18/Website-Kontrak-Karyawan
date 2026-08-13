@@ -804,7 +804,7 @@ const UI = {
 
   renderDashboard() {
     const { karyawan, log, jabatan } = AppState;
-    document.getElementById('stat-total').textContent  = karyawan.length;
+    // document.getElementById('stat-total').textContent  = karyawan.length;
     document.getElementById('stat-baru').textContent   = karyawan.filter(k => k.Status === 'Baru Masuk').length;
     document.getElementById('stat-aktif').textContent  = karyawan.filter(k => k.Status === 'Aktif').length;
     document.getElementById('stat-resign').textContent = karyawan.filter(k => k.Status === 'Resign').length;
