@@ -158,7 +158,7 @@
     <div class="page" id="page-upload">
       <div class="page-header">
         <h1>Upload Data Karyawan</h1>
-        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Jabatan, SBU, BKO Jabatan, BKO SBU, Slot BOQ, Slot Real, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.</p>
+        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.</p>
         <p style="color:var(--text2);margin-top:4px;">ℹ️ Kolom <strong>Status</strong> menerima: "Baru Masuk", "Aktif", atau "Resign" (tidak peka huruf besar/kecil). Jika kosong, akan otomatis diisi "Aktif".</p>
         <p style="color:var(--warning);margin-top:4px;">🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> Baris dengan NIP yang sudah terdaftar di sistem akan otomatis dilewati saat upload — hanya data dengan NIP baru yang akan ditambahkan.</p>
       </div>
@@ -235,7 +235,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>NIK</th><th>Jabatan</th><th>SBU</th><th>BKO Jabatan</th><th>BKO SBU</th><th>Slot BOQ</th><th>Slot Real</th><th>NIP Baru</th><th>Email Pribadi</th><th>Email Korporat</th><th>Nama Akun ICRM</th><th>No. Telp</th><th>Ukuran Baju</th><th>Tgl Masuk</th><th>Tgl Keluar</th><th>Tgl Update</th><th>Status</th></tr>
+            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>NIK</th><th>Grade</th><th>Jabatan</th><th>SBU</th><th>BKO Jabatan</th><th>BKO SBU</th><th>NIP Baru</th><th>Email Pribadi</th><th>Email Korporat</th><th>Nama Akun ICRM</th><th>No. Telp</th><th>Ukuran Baju</th><th>Tgl Masuk</th><th>Tgl Keluar</th><th>Tgl Update</th><th>Status</th></tr>
           </thead>
           <tbody id="karyawanBody"></tbody>
         </table>
@@ -269,7 +269,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>NIP</th><th>Nama</th><th>Jabatan</th><th>SBU</th><th>Slot Real</th><th>Tgl Update</th><th>Aksi</th></tr>
+            <tr><th>NIP</th><th>Nama</th><th>Grade</th><th>Jabatan</th><th>SBU</th><th>Tgl Update</th><th>Aksi</th></tr>
           </thead>
           <tbody id="pindahBody"></tbody>
         </table>
@@ -330,6 +330,14 @@
       </div>
     </div>
     
+    <!-- ✅ BARU: Grade -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Grade</label>
+        <input type="text" class="form-control" id="editGrade" placeholder="mis. G1, G2, Staff">
+      </div>
+    </div>
+
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Jabatan</label>
@@ -351,17 +359,6 @@
       <div class="form-group">
         <label class="form-label">BKO SBU</label>
         <select class="form-control" id="editBKOSBU"></select>
-      </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Slot BOQ</label>
-        <input type="text" class="form-control" id="editSlotBOQ">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Slot Real</label>
-        <input type="text" class="form-control" id="editSlotReal">
       </div>
     </div>
 

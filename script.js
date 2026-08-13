@@ -173,12 +173,11 @@ const Models = {
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
       NIK:           String(data.NIK || '').trim(),                          // ✅ BARU
+      Grade:         String(data.Grade || '').trim().toUpperCase(),          // ✅ BARU
       Jabatan:       Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       SBU:           Utils.resolveSBU(String(data.SBU || '').trim()),
       BKOJabatan:    Utils.resolveJabatan(String(data.BKOJabatan || '').trim()),
       BKOSBU:        Utils.resolveSBU(String(data.BKOSBU || '').trim()),
-      SlotBOQ:       String(data.SlotBOQ || '').trim(),
-      SlotReal:      String(data.SlotReal || '').trim(),
       NIPBaru:       String(data.NIPBaru || '').trim(),
       Email:         String(data.Email || '').trim(),                        // Email Pribadi (lama)
       EmailKorporat: String(data.EmailKorporat || '').trim(),                // ✅ BARU
@@ -308,17 +307,6 @@ const Utils = {
     const detail = AppState.slotConfig[sbu];
     if (!detail || !detail.jabatan) return 0;
     return Object.values(detail.jabatan).reduce((sum, v) => sum + (Number(v) || 0), 0);
-  },
-
-  // ✅ BARU: Ambil slot fix (Slot BOQ) untuk kombinasi SBU + Jabatan dari slotConfig saat ini.
-  // Dipakai saat export supaya "Slot BOQ" yang diexport selalu mengikuti Slot Jabatan per SBU
-  // yang berlaku sekarang (termasuk kalau sudah diedit superadmin), bukan nilai lama per-baris
-  // karyawan yang mungkin sudah usang. Return null kalau kombinasinya tidak ditemukan.
-  getSlotFixJabatan(sbu, jabatan) {
-    const detail = AppState.slotConfig[sbu];
-    if (!detail || !detail.jabatan) return null;
-    const val = detail.jabatan[jabatan];
-    return (val === undefined || val === null || val === '') ? null : val;
   },
 
   // ✅ BARU: Total slot fix keseluruhan (dihitung dinamis dari slotConfig, bukan angka statis)
@@ -611,12 +599,11 @@ const EmployeeService = {
   },
 
   // ✅ DIUBAH: bulkUpload kini menerapkan Primary Key NIP — hanya data baru (NIP belum pernah ada) yang ditambahkan
-  // ✅ BARU: Bangun Slot Jabatan per SBU secara dinamis dari data karyawan yang diupload,
-  // menggantikan variabel statis CONFIG.SLOT_PER_SBU yang lama.
-  // Logikanya: kolom "Slot BOQ" di Excel merepresentasikan jumlah slot fix untuk
-  // kombinasi SBU + Jabatan tsb, jadi kita ambil nilai SlotBOQ per kombinasi
-  // (memakai nilai terbesar yang ditemukan, untuk berjaga-jaga kalau ada baris yang
-  // kebetulan kosong/0), lalu total per SBU = jumlah slot semua jabatan di dalamnya.
+  // ✅ DIUBAH: Bangun Slot Jabatan per SBU secara dinamis dari data karyawan yang diupload.
+  // Kolom "Slot BOQ" sudah dihapus dari data karyawan, jadi Slot Fix awal sekarang memakai
+  // JUMLAH KARYAWAN saat ini per kombinasi SBU + Jabatan (headcount saat upload pertama)
+  // sebagai baseline — superadmin bisa menyesuaikannya kapan saja lewat tombol "Edit Slot"
+  // di halaman Slot Jabatan.
   buildSlotConfigFromData(employees) {
     const config = {};
 
@@ -625,11 +612,8 @@ const EmployeeService = {
       const jab = emp.Jabatan;
       if (!sbu || !jab) return;
 
-      const slotBOQ = Number(emp.SlotBOQ) || 0;
       if (!config[sbu]) config[sbu] = { total: 0, jabatan: {} };
-
-      const current = config[sbu].jabatan[jab] || 0;
-      config[sbu].jabatan[jab] = Math.max(current, slotBOQ);
+      config[sbu].jabatan[jab] = (config[sbu].jabatan[jab] || 0) + 1;
     });
 
     Object.values(config).forEach(detail => {
@@ -959,7 +943,7 @@ const UI = {
         <div class="empty">
           <div class="empty-icon">📊</div>
           <h3>Belum ada Slot Jabatan</h3>
-          <p>Slot Jabatan per SBU akan otomatis terbentuk mengikuti kolom "Slot BOQ" pada file Excel yang pertama kali Anda upload.</p>
+          <p>Slot Jabatan per SBU akan otomatis terbentuk mengikuti jumlah karyawan pada file Excel yang pertama kali Anda upload.</p>
         </div>`;
       return;
     }
@@ -1047,7 +1031,7 @@ const UI = {
     const pageContainer = document.getElementById('paginationKaryawan');
 
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="20"><div class="empty"><div class="empty-icon">👥</div><h3>Tidak ada data</h3></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="19"><div class="empty"><div class="empty-icon">👥</div><h3>Tidak ada data</h3></div></td></tr>`;
       pageContainer.style.display = 'none';
       return;
     }
@@ -1070,8 +1054,9 @@ const UI = {
         <td class="mono">${k.NIP}</td>
         <td style="font-weight:500;cursor:pointer;color:var(--accent2)" onclick="Handlers.openDetailModal(${k.id})" title="Lihat detail karyawan">${k.Nama}</td>
         <td class="mono">${k.NIK || '—'}</td>
+        <td>${k.Grade ? `<span class="pill pill-purple">${k.Grade}</span>` : '—'}</td>
         <td><span class="pill pill-blue">${k.Jabatan}</span></td><td>${k.SBU}</td>
-        <td>${k.BKOJabatan}</td><td>${k.BKOSBU}</td><td>${k.SlotBOQ}</td><td>${k.SlotReal}</td>
+        <td>${k.BKOJabatan}</td><td>${k.BKOSBU}</td>
         <td class="mono">${k.NIPBaru}</td>
         <td>${k.Email || '—'}</td>
         <td>${k.EmailKorporat || '—'}</td>
@@ -1128,8 +1113,9 @@ const UI = {
     tbody.innerHTML = filtered.map(k => `
       <tr>
         <td class="mono">${k.NIP}</td><td style="font-weight:500">${k.Nama}</td>
+        <td>${k.Grade ? `<span class="pill pill-purple">${k.Grade}</span>` : '—'}</td>
         <td><span class="pill pill-blue">${k.Jabatan}</span></td><td>${k.SBU}</td>
-        <td>${k.SlotReal}</td><td style="font-size:12px;color:var(--text2)">${k.TglUpdate}</td>
+        <td style="font-size:12px;color:var(--text2)">${k.TglUpdate}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="Handlers.openQuickMoveModal(${k.id})">🔄 Pindah</button></td>
       </tr>`).join('');
   },
@@ -1203,7 +1189,7 @@ const Handlers = {
       const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
       if (!raw.length) return Utils.toast('❌ File kosong!');
 
-      const COLS = ['NIP','Nama','NIK','Jabatan','SBU','BKO Jabatan','BKO SBU','Slot BOQ','Slot Real','NIP Baru',
+      const COLS = ['NIP','Nama','NIK','Grade','Jabatan','SBU','BKO Jabatan','BKO SBU','NIP Baru',
         'Email','Email Korporat','Nama Akun ICRM','Tanggal Masuk','Tanggal Keluar','Ukuran Baju','Nomor Telpon','Status','Catatan Status'];
       const header = raw[0].map(h => String(h).trim());
 
@@ -1268,10 +1254,10 @@ const Handlers = {
     if (!AppState.previewUpload.length) return Utils.toast('❌ Tidak ada data!');
     // ✅ BARU: Mapping nama kolom Excel ke nama field model
     const mapped = AppState.previewUpload.map(r => ({
-      NIP: r['NIP'], Nama: r['Nama'], NIK: r['NIK'],
+      NIP: r['NIP'], Nama: r['Nama'], NIK: r['NIK'], Grade: r['Grade'],
       Jabatan: r['Jabatan'], SBU: r['SBU'],
       BKOJabatan: r['BKO Jabatan'], BKOSBU: r['BKO SBU'],
-      SlotBOQ: r['Slot BOQ'], SlotReal: r['Slot Real'], NIPBaru: r['NIP Baru'],
+      NIPBaru: r['NIP Baru'],
       Email: r['Email'], EmailKorporat: r['Email Korporat'],
       NamaAkunICRM: r['Nama Akun ICRM'],
       TglMasuk: r['Tanggal Masuk'], TglKeluar: r['Tanggal Keluar'],
@@ -1284,7 +1270,7 @@ const Handlers = {
 
     const skippedTotal = stats.duplicateExisting + stats.duplicateInFile + stats.invalid;
     const slotNote = stats.slotConfigBuilt
-      ? ' 📊 Slot Jabatan per SBU otomatis dibangun mengikuti data Slot BOQ di file ini.'
+      ? ' 📊 Slot Jabatan per SBU otomatis dibangun mengikuti jumlah karyawan di file ini (bisa disesuaikan lewat Edit Slot).'
       : '';
     if (skippedTotal > 0) {
       Utils.toast(`✅ ${stats.added} data baru ditambahkan. ⚠ ${skippedTotal} baris dilewati (duplikat/tidak valid).${slotNote}`, 6000);
@@ -1333,9 +1319,9 @@ const Handlers = {
         </div>
         <div class="detail-info-grid">
           ${infoItem('NIK', `<span class="mono">${emp.NIK}</span>`)}
+          ${infoItem('Grade', emp.Grade ? `<span class="pill pill-purple">${emp.Grade}</span>` : '—')}
           ${infoItem('Jabatan Saat Ini', `<span class="pill pill-blue">${emp.Jabatan}</span>`)}
           ${infoItem('SBU', emp.SBU)}
-          ${infoItem('Slot BOQ / Real', `${emp.SlotBOQ || '—'} / ${emp.SlotReal || '—'}`)}
           ${infoItem('BKO Jabatan', emp.BKOJabatan)}
           ${infoItem('BKO SBU', emp.BKOSBU)}
           ${infoItem('Email', emp.Email)}
@@ -1399,12 +1385,11 @@ const Handlers = {
     document.getElementById('editNIP').value          = emp.NIP;
     document.getElementById('editNama').value         = emp.Nama;
     document.getElementById('editNIK').value          = emp.NIK || '';                        // ✅ BARU
+    document.getElementById('editGrade').value        = emp.Grade || '';                       // ✅ BARU
     document.getElementById('editJabatan').value      = emp.Jabatan;
     document.getElementById('editSBU').value          = emp.SBU;
     document.getElementById('editBKOJabatan').value   = emp.BKOJabatan; // ✅ set value dropdown
     document.getElementById('editBKOSBU').value       = emp.BKOSBU;     // ✅ set value dropdown
-    document.getElementById('editSlotBOQ').value      = emp.SlotBOQ;
-    document.getElementById('editSlotReal').value     = emp.SlotReal;
     document.getElementById('editNIPBaru').value      = emp.NIPBaru;
     document.getElementById('editEmail').value        = emp.Email;
     document.getElementById('editEmailKorporat').value= emp.EmailKorporat || '';               // ✅ BARU
@@ -1433,7 +1418,7 @@ const Handlers = {
     const Nama = document.getElementById('editNama').value.trim();
     const TglMasuk = document.getElementById('editTglMasuk').value;
     if (!NIP || !Nama) return Utils.toast('❌ NIP dan Nama wajib diisi!');
-    // if (!TglMasuk) return Utils.toast('❌ Tanggal Masuk wajib diisi!'); // ✅ BARU: validasi mandatory
+    if (!TglMasuk) return Utils.toast('❌ Tanggal Masuk wajib diisi!'); // ✅ BARU: validasi mandatory
 
     const BKOJabatanValue = document.getElementById('editBKOJabatan').value.toUpperCase();
     // ✅ BARU: Jika BKO Jabatan diisi, Jabatan resmi mengikuti nilai BKO Jabatan tsb.
@@ -1443,12 +1428,11 @@ const Handlers = {
     const formData = {
       NIP, Nama,
       NIK:           document.getElementById('editNIK').value,               // ✅ BARU
+      Grade:         document.getElementById('editGrade').value,             // ✅ BARU
       Jabatan:       JabatanValue,
       SBU:           document.getElementById('editSBU').value,
       BKOJabatan:    BKOJabatanValue,
       BKOSBU:        document.getElementById('editBKOSBU').value.toUpperCase(),     // ✅ uppercase
-      SlotBOQ:       document.getElementById('editSlotBOQ').value,
-      SlotReal:      document.getElementById('editSlotReal').value,
       NIPBaru:       document.getElementById('editNIPBaru').value,
       Email:         document.getElementById('editEmail').value,
       EmailKorporat: document.getElementById('editEmailKorporat').value,     // ✅ BARU
@@ -1742,22 +1726,14 @@ const Handlers = {
     const sourceData = data || AppState.karyawan;
     if (!sourceData.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
 
-    const rows = sourceData.map(k => {
-      // ✅ BARU: "Slot BOQ" yang diexport mengikuti Slot Fix (slotConfig) SBU+Jabatan saat ini.
-      // Kalau kombinasinya belum tercatat di slotConfig (mis. jabatan/SBU baru yang belum
-      // pernah di-set), fallback ke nilai SlotBOQ yang tersimpan di data karyawan itu sendiri.
-      const slotFix = Utils.getSlotFixJabatan(k.SBU, k.Jabatan);
-      return {
-        'NIP': k.NIP, 'Nama': k.Nama, 'NIK': k.NIK, 'Jabatan': k.Jabatan, 'SBU': k.SBU,
-        'BKO Jabatan': k.BKOJabatan, 'BKO SBU': k.BKOSBU,
-        'Slot BOQ': slotFix !== null ? slotFix : k.SlotBOQ,
-        'Slot Real': k.SlotReal, 'NIP Baru': k.NIPBaru,
-        'Email': k.Email, 'Email Korporat': k.EmailKorporat, 'Nama Akun ICRM': k.NamaAkunICRM,
-        'Tanggal Masuk': k.TglMasuk, 'Tanggal Keluar': k.TglKeluar,
-        'Ukuran Baju': k.UkuranBaju, 'Nomor Telpon': k.NoTelp,
-        'Tanggal Update': k.TglUpdate, 'Status': k.Status, 'Catatan Status': k.StatusCatatan
-      };
-    });
+    const rows = sourceData.map(k => ({
+      'NIP': k.NIP, 'Nama': k.Nama, 'NIK': k.NIK, 'Grade': k.Grade, 'Jabatan': k.Jabatan, 'SBU': k.SBU,
+      'BKO Jabatan': k.BKOJabatan, 'BKO SBU': k.BKOSBU, 'NIP Baru': k.NIPBaru,
+      'Email': k.Email, 'Email Korporat': k.EmailKorporat, 'Nama Akun ICRM': k.NamaAkunICRM,
+      'Tanggal Masuk': k.TglMasuk, 'Tanggal Keluar': k.TglKeluar,
+      'Ukuran Baju': k.UkuranBaju, 'Nomor Telpon': k.NoTelp,
+      'Tanggal Update': k.TglUpdate, 'Status': k.Status, 'Catatan Status': k.StatusCatatan
+    }));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Data Karyawan');
