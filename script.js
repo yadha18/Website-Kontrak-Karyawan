@@ -158,6 +158,7 @@ const AppState = {
   logPagination: { page: 1, size: 10 }, // ✅ BARU: pagination untuk Review Log Perubahan
   modals: { editTargetId: null, statusTargetId: null },
   slotPanelOpen: {}, // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
+  slotJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan, key = "SBU::Jabatan"
 
   // ✅ BARU: State autentikasi superadmin (khusus sesi ini, reset saat reload halaman)
   superadminAuthed: false,
@@ -961,15 +962,42 @@ const UI = {
       const sbuEscaped = sbu.replace(/'/g, "\\'");
 
       const jabatanRows = Object.entries(detail.jabatan).map(([jab, slotFix]) => {
-        const terisi = aktifKaryawan.filter(k => k.SBU === sbu && k.Jabatan === jab).length;
+        const jabEmployees = aktifKaryawan.filter(k => k.SBU === sbu && k.Jabatan === jab);
+        const terisi = jabEmployees.length;
         const sisa = slotFix - terisi;
         const statusColor = sisa < 0 ? 'var(--danger)' : sisa === 0 ? 'var(--success)' : 'var(--warning)';
-        return `<tr>
-          <td style="padding-left:24px;color:var(--text2);font-size:12px;">${jab}</td>
-          <td class="mono" style="text-align:center;">${slotFix}</td>
-          <td class="mono" style="text-align:center;">${terisi}</td>
-          <td class="mono" style="text-align:center;color:${statusColor};font-weight:600;">${sisa}</td>
-        </tr>`;
+
+        // ✅ BARU: dropdown rincian nama karyawan per Jabatan — klik baris untuk buka/tutup
+        const jabKey = `${sbu}::${jab}`;
+        const jabKeyEscaped = jabKey.replace(/'/g, "\\'");
+        const jabOpen = AppState.slotJabatanPanelOpen && AppState.slotJabatanPanelOpen[jabKey];
+
+        const namesList = jabEmployees.length
+          ? jabEmployees
+              .slice()
+              .sort((a, b) => a.Nama.localeCompare(b.Nama))
+              .map(e => `
+                <div class="slot-jabatan-employee">
+                  <span>${e.Nama}</span>
+                  <span class="mono" style="color:var(--text2);font-size:11px;">${e.NIP}</span>
+                </div>`).join('')
+          : `<div style="color:var(--text3);font-size:12px;padding:6px 2px;">Belum ada karyawan di jabatan ini.</div>`;
+
+        return `
+          <tr class="slot-jabatan-row" onclick="Handlers.toggleSlotJabatanPanel('${jabKeyEscaped}')" title="Klik untuk lihat rincian nama karyawan">
+            <td style="padding-left:24px;color:var(--text2);font-size:12px;">
+              <span class="slot-accordion-arrow ${jabOpen ? 'open' : ''}" style="font-size:9px;margin-right:6px;display:inline-block;">▶</span>${jab}
+            </td>
+            <td class="mono" style="text-align:center;">${slotFix}</td>
+            <td class="mono" style="text-align:center;">${terisi}</td>
+            <td class="mono" style="text-align:center;color:${statusColor};font-weight:600;">${sisa}</td>
+          </tr>
+          ${jabOpen ? `
+          <tr class="slot-jabatan-detail-row">
+            <td colspan="4" style="padding:0;">
+              <div class="slot-jabatan-employee-list">${namesList}</div>
+            </td>
+          </tr>` : ''}`;
       }).join('');
 
       return `
@@ -1567,6 +1595,12 @@ const Handlers = {
   // ✅ BARU: Toggle buka/tutup panel accordion slot jabatan per SBU
   toggleSlotPanel(sbu) {
     AppState.slotPanelOpen[sbu] = !AppState.slotPanelOpen[sbu];
+    UI.renderSlotJabatan();
+  },
+
+  // ✅ BARU: Toggle dropdown rincian nama karyawan untuk satu kombinasi SBU + Jabatan
+  toggleSlotJabatanPanel(jabKey) {
+    AppState.slotJabatanPanelOpen[jabKey] = !AppState.slotJabatanPanelOpen[jabKey];
     UI.renderSlotJabatan();
   },
 
