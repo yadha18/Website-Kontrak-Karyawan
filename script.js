@@ -168,7 +168,7 @@ const AppState = {
   pagination: { page: 1, size: 10 },
   logPagination: { page: 1, size: 10 }, // ✅ BARU: pagination untuk Review Log Perubahan
   lemburPagination: { page: 1, size: 10 }, // ✅ BARU: pagination untuk Tabel Data Lembur dan SPPD Karyawan
-  modals: { editTargetId: null, statusTargetId: null, statusListTarget: null },
+  modals: { editTargetId: null, statusTargetId: null, statusListTarget: null, lemburEditId: null },
   slotPanelOpen: {}, // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
   slotJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan, key = "SBU::Jabatan"
 
@@ -1266,7 +1266,10 @@ const UI = {
 
     tbody.innerHTML = paginated.map(l => `
       <tr>
-        <td><button class="btn btn-danger btn-sm" onclick="Handlers.deleteLembur(${l.id})">🗑 Hapus</button></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick="openModalLembur(${l.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="Handlers.deleteLembur(${l.id})">🗑</button>
+        </td>
         <td class="mono">${l.NIP}</td>
         <td style="font-weight:500">${l.Nama || '—'}</td>
         <td class="mono">${Utils.formatRupiah(l.Nominal)}</td>
@@ -1382,7 +1385,7 @@ const UI = {
       return;
     }
 
-    const pillColor = { 'lembur upload': 'green', 'lembur hapus': 'yellow', 'lembur config': 'blue', 'lembur tiket': 'purple' };
+    const pillColor = { 'lembur upload': 'green', 'lembur hapus': 'yellow', 'lembur config': 'blue', 'lembur tiket': 'purple', 'lembur tambah': 'green', 'lembur edit': 'blue', 'lembur hapus semua': 'red' };
     container.innerHTML = `
       <div class="table-wrap">
         <table>
@@ -2105,6 +2108,111 @@ const Handlers = {
     Utils.toast(adaPerubahan ? `✅ Slot fix "${sbu}" berhasil diperbarui` : 'ℹ️ Tidak ada perubahan');
   },
 
+  // ✅ BARU: Validasi tombol "Hapus Semua" — tombol aktif hanya jika user mengetik persis "HAPUS SEMUA"
+  validateHapusSemuaInput(inputId, btnId) {
+    const ok = document.getElementById(inputId).value === 'HAPUS SEMUA';
+    const btn = document.getElementById(btnId);
+    btn.disabled = !ok;
+    btn.style.opacity = ok ? '1' : '0.5';
+    btn.style.cursor = ok ? 'pointer' : 'not-allowed';
+  },
+
+  // ✅ BARU: Hapus semua data Lembur & SPPD (validasi sama seperti Hapus Semua Karyawan — wajib ketik "HAPUS SEMUA")
+  openModalHapusSemuaLembur() {
+    if (!AppState.lembur.length) return Utils.toast('ℹ️ Tidak ada data lembur/SPPD untuk dihapus.');
+    document.getElementById('deleteAllLemburCount').textContent = AppState.lembur.length + ' data';
+    document.getElementById('inputKonfirmasiHapusSemuaLembur').value = '';
+    const btn = document.getElementById('btnConfirmDeleteAllLembur');
+    btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
+    document.getElementById('modalConfirmDeleteAllLembur').classList.add('open');
+  },
+
+  confirmHapusSemuaLembur() {
+    const input = document.getElementById('inputKonfirmasiHapusSemuaLembur').value;
+    if (input !== 'HAPUS SEMUA') return;
+
+    const jumlah = AppState.lembur.length;
+    AppState.log.push(Models.LogChange('SYSTEM', 'SYSTEM', 'lembur hapus semua', `${jumlah} data`, '(semua dihapus)'));
+    AppState.lembur = [];
+    AppState.lemburPagination.page = 1;
+    DB.save();
+
+    UI.closeModal('modalConfirmDeleteAllLembur');
+    UI.renderLemburTable();
+    UI.renderDashboardNonPO();
+    Utils.toast(`🗑 Semua data lembur/SPPD (${jumlah}) berhasil dihapus`);
+  },
+
+  // ✅ BARU: Buka modal Tambah/Edit Manual Data Lembur & SPPD (id null = tambah baru)
+  openLemburModal(id) {
+    AppState.modals.lemburEditId = id;
+    const isEdit = id !== null && id !== undefined;
+    document.getElementById('modalLemburTitle').textContent = isEdit ? '✏️ Edit Data Lembur/SPPD' : '➕ Tambah Data Lembur/SPPD';
+    document.getElementById('lemburNIPWarning').style.display = 'none';
+
+    if (isEdit) {
+      const item = AppState.lembur.find(l => l.id === id);
+      if (!item) return;
+      document.getElementById('lemburNIP').value = item.NIP;
+      document.getElementById('lemburNominal').value = item.Nominal;
+      document.getElementById('lemburBulan').value = item.Bulan;
+      document.getElementById('lemburTagihan').value = item.Tagihan;
+    } else {
+      document.getElementById('lemburNIP').value = '';
+      document.getElementById('lemburNominal').value = '';
+      document.getElementById('lemburBulan').value = '';
+      document.getElementById('lemburTagihan').value = 'SPPD 1';
+    }
+    this.lookupLemburNIP();
+    document.getElementById('modalEditLembur').classList.add('open');
+  },
+
+  // ✅ BARU: Auto-lookup Nama/SBU/Jabatan dari Data Karyawan berdasarkan NIP yang diketik
+  lookupLemburNIP() {
+    const nip = document.getElementById('lemburNIP').value.trim();
+    const emp = AppState.karyawan.find(k => k.NIP === nip);
+    document.getElementById('lemburNamaPreview').value = emp ? emp.Nama : '';
+    document.getElementById('lemburSBUPreview').value = emp ? emp.SBU : '';
+    document.getElementById('lemburJabatanPreview').value = emp ? emp.Jabatan : '';
+    document.getElementById('lemburNIPWarning').style.display = (nip && !emp) ? 'block' : 'none';
+  },
+
+  // ✅ BARU: Simpan data Lembur/SPPD manual (tambah baru atau edit), dicatat ke log "lembur"
+  saveLemburManual() {
+    const nip = document.getElementById('lemburNIP').value.trim();
+    const nominal = Number(document.getElementById('lemburNominal').value);
+    const bulan = document.getElementById('lemburBulan').value.trim();
+    const tagihan = document.getElementById('lemburTagihan').value;
+
+    if (!nip) return Utils.toast('❌ NIP wajib diisi!');
+    if (!nominal || nominal <= 0) return Utils.toast('❌ Nominal harus lebih dari 0!');
+    if (!bulan) return Utils.toast('❌ Bulan wajib diisi!');
+
+    const emp = AppState.karyawan.find(k => k.NIP === nip);
+    const enriched = { NIP: nip, Nominal: nominal, Bulan: bulan, Tagihan: tagihan,
+      Nama: emp ? emp.Nama : '', SBU: emp ? emp.SBU : '', Jabatan: emp ? emp.Jabatan : '' };
+
+    const editId = AppState.modals.lemburEditId;
+    if (editId !== null && editId !== undefined) {
+      const idx = AppState.lembur.findIndex(l => l.id === editId);
+      if (idx === -1) return;
+      AppState.lembur[idx] = Models.Lembur({ ...enriched, id: editId });
+      AppState.log.push(Models.LogChange(nip, enriched.Nama || nip, 'lembur edit',
+        '-', `${tagihan} · ${bulan} · ${Utils.formatRupiah(nominal)}`, 'Data diedit manual'));
+      Utils.toast('✅ Data berhasil diperbarui');
+    } else {
+      AppState.lembur.push(Models.Lembur(enriched));
+      AppState.log.push(Models.LogChange(nip, enriched.Nama || nip, 'lembur tambah',
+        '-', `${tagihan} · ${bulan} · ${Utils.formatRupiah(nominal)}`, 'Data ditambahkan manual'));
+      Utils.toast('✅ Data berhasil ditambahkan');
+    }
+
+    DB.save();
+    closeModal('modalEditLembur');
+    this.resetLemburPageAndRender();
+    UI.renderDashboardNonPO();
+  },
+
   // ✅ BARU: Hapus satu baris Data Lembur / SPPD Karyawan (dicatat ke log terpisah "lembur hapus")
   deleteLembur(id) {
     const item = AppState.lembur.find(l => l.id === id);
@@ -2357,6 +2465,7 @@ window.resetLemburPageAndRender = () => Handlers.resetLemburPageAndRender();  //
 window.changeLemburPageSize     = () => Handlers.changeLemburPageSize();      // ✅ BARU
 window.exportLemburExcel        = () => Handlers.exportLemburExcel();         // ✅ BARU
 window.exportDashboardNonPOExcel= () => Handlers.exportDashboardNonPOExcel(); // ✅ BARU
+window.openModalLembur          = (id) => Handlers.openLemburModal(id);      // ✅ BARU
 
 // Initialize application
 ThemeService.init();
