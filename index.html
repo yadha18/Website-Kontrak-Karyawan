@@ -33,9 +33,16 @@
 <div class="layout">
   <nav class="sidebar">
     <div class="nav-label">Menu</div>
-    <button class="nav-item active" onclick="navigate('dashboard')"><span class="icon">📊</span> Dashboard</button>
     <button class="nav-item" onclick="navigate('upload')"><span class="icon">📂</span> Upload Data</button>
-    <button class="nav-item" onclick="navigate('karyawan')"><span class="icon">👥</span> Data Karyawan</button>
+
+    <div class="nav-label">Data Informasi Karyawan</div>
+    <button class="nav-item active" onclick="navigate('dashboard')"><span class="icon">📊</span> Dashboard Karyawan</button>
+    <button class="nav-item" onclick="navigate('karyawan')"><span class="icon">👥</span> Tabel Data Karyawan</button>
+
+    <div class="nav-label">Data Lembur dan SPPD Karyawan</div>
+    <button class="nav-item" onclick="navigate('dashboard-nonpo')"><span class="icon">📈</span> Dashboard Non PO</button>
+    <button class="nav-item" onclick="navigate('lembur')"><span class="icon">🧾</span> Tabel Lembur & SPPD</button>
+
     <!-- <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button> -->
     <div class="nav-label">Pengaturan</div>
     <button class="nav-item" onclick="navigate('jabatan')"><span class="icon">📋</span> Daftar Jabatan</button>
@@ -45,7 +52,7 @@
 
     <div class="page active" id="page-dashboard">
       <div class="page-header">
-        <h1>Dashboard</h1>
+        <h1>Dashboard Karyawan</h1>
         <p>Ringkasan data karyawan, status, dan perubahan historis.</p>
       </div>
 
@@ -88,9 +95,9 @@
       <div id="dashboard-content" style="display:none;">
       <div class="stat-grid">
         <!-- <div class="stat-card"><div class="stat-label">Total Karyawan</div><div class="stat-value accent" id="stat-total">0</div></div> -->
-        <div class="stat-card"><div class="stat-label">🟢 Karyawan Baru</div><div class="stat-value success" id="stat-baru">0</div></div>
-        <div class="stat-card"><div class="stat-label">🔵 Aktif</div><div class="stat-value accent" id="stat-aktif">0</div></div>
-        <div class="stat-card"><div class="stat-label">🔴 Resign</div><div class="stat-value danger" id="stat-resign">0</div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="Handlers.openStatusListModal('Baru Masuk')" title="Klik untuk lihat daftar karyawan"><div class="stat-label">🟢 Karyawan Baru</div><div class="stat-value success" id="stat-baru">0</div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="Handlers.openStatusListModal('Aktif')" title="Klik untuk lihat daftar karyawan"><div class="stat-label">🔵 Aktif</div><div class="stat-value accent" id="stat-aktif">0</div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="Handlers.openStatusListModal('Resign')" title="Klik untuk lihat daftar karyawan"><div class="stat-label">🔴 Resign</div><div class="stat-value danger" id="stat-resign">0</div></div>
         <div class="stat-card"><div class="stat-label">Data Diubah</div><div class="stat-value warning" id="stat-changed">0</div></div>
       </div>
 
@@ -157,11 +164,20 @@
 
     <div class="page" id="page-upload">
       <div class="page-header">
-        <h1>Upload Data Karyawan</h1>
-        <p>Upload file Excel (.xlsx / .xls). Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.</p>
-        <p style="color:var(--text2);margin-top:4px;">ℹ️ Kolom <strong>Status</strong> menerima: "Baru Masuk", "Aktif", atau "Resign" (tidak peka huruf besar/kecil). Jika kosong, akan otomatis diisi "Aktif".</p>
-        <p style="color:var(--warning);margin-top:4px;">🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> Baris dengan NIP yang sudah terdaftar di sistem akan otomatis dilewati saat upload — hanya data dengan NIP baru yang akan ditambahkan.</p>
+        <h1>Upload Data</h1>
+        <p>Pilih jenis data yang ingin diupload, lalu pilih file Excel (.xlsx / .xls). Maks 10 MB.</p>
       </div>
+
+      <!-- ✅ BARU: Pilihan jenis data sebelum upload (poin 1) -->
+      <div class="card">
+        <div class="card-title">🗂️ Jenis Data</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btnUploadTypeKaryawan" onclick="setUploadType('karyawan')">👥 Data Karyawan</button>
+          <button class="btn btn-secondary" id="btnUploadTypeLembur" onclick="setUploadType('lembur')">🧾 Data Lembur & SPPD Karyawan</button>
+        </div>
+        <div id="uploadTypeDesc" style="margin-top:12px;font-size:12px;color:var(--text2);line-height:1.6;"></div>
+      </div>
+
       <div class="card">
         <div class="card-title">📂 Pilih File Excel</div>
         <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
@@ -191,7 +207,7 @@
       <div class="page-header">
         <div class="flex-between">
           <div>
-            <h1>Data Karyawan</h1>
+            <h1>Tabel Data Karyawan</h1>
             <p>Semua data detail karyawan. Anda dapat mengedit seluruh data & status secara manual.</p>
           </div>
           <div style="display:flex;gap:8px;">
@@ -254,6 +270,66 @@
         </div>
         <div class="page-controls" id="pageControls">
           </div>
+      </div>
+    </div>
+
+    <!-- ✅ BARU: Dashboard Non PO (submenu Data Lembur dan SPPD Karyawan) -->
+    <div class="page" id="page-dashboard-nonpo">
+      <div class="page-header">
+        <h1>Dashboard Non PO</h1>
+        <p>Ringkasan PAGU, BNLP, dan realisasi SPPD/Lembur per SBU.</p>
+      </div>
+      <div class="card" id="nonpo-summary-card"></div>
+      <div class="card">
+        <div class="card-title">📊 Rincian PAGU &amp; Realisasi per SBU</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">ℹ️ Kolom <strong>PAGU Non PO</strong> dan <strong>BNLP</strong> diisi manual (nilai tahunan) — kolom lainnya dihitung otomatis.</p>
+        <div id="nonpo-table"></div>
+      </div>
+      <!-- ✅ BARU: Log Perubahan khusus Data Lembur & SPPD (terpisah dari log Data Karyawan) -->
+      <div class="card">
+        <div class="card-title">🔄 Review Log Perubahan — Data Lembur &amp; SPPD</div>
+        <div id="lembur-log-table"></div>
+      </div>
+    </div>
+
+    <!-- ✅ BARU: Tabel Data Lembur dan SPPD Karyawan (submenu Data Lembur dan SPPD Karyawan) -->
+    <div class="page" id="page-lembur">
+      <div class="page-header">
+        <h1>Tabel Data Lembur dan SPPD Karyawan</h1>
+        <p>Data lembur dan SPPD yang sudah diupload. Nama, SBU, dan Jabatan diambil otomatis dari Data Karyawan.</p>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchLembur" placeholder="🔍  Cari NIP atau Nama..." oninput="resetLemburPageAndRender()">
+        <select id="filterLemburSBU" onchange="resetLemburPageAndRender()"><option value="">Semua SBU</option></select>
+        <select id="filterLemburBulan" onchange="resetLemburPageAndRender()"><option value="">Semua Bulan</option></select>
+        <select id="filterLemburTagihan" onchange="resetLemburPageAndRender()">
+          <option value="">Semua Tagihan</option>
+          <option value="SPPD 1">SPPD 1</option>
+          <option value="SPPD 2">SPPD 2</option>
+          <option value="Lembur">Lembur</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>Nominal</th><th>SBU</th><th>Jabatan</th><th>Bulan</th><th>Tagihan</th></tr></thead>
+          <tbody id="lemburBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination-container" id="paginationLembur" style="display: none;">
+        <div class="page-info">
+          Menampilkan
+          <select id="lemburPageSize" onchange="changeLemburPageSize()">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          data per halaman. Total: <span id="totalLemburData" style="font-weight:600;color:var(--text)">0</span> data.
+        </div>
+        <div class="page-controls" id="lemburPageControls"></div>
+      </div>
+      <div class="flex-end">
+        <button class="btn btn-success" onclick="exportLemburExcel()">⬇ Export Excel Data Lembur &amp; SPPD</button>
       </div>
     </div>
 
@@ -604,6 +680,26 @@
     <div class="flex-end" style="margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('modalEditSlot')">Batal</button>
       <button class="btn btn-primary" onclick="saveEditSlot()">💾 Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal daftar karyawan berdasarkan status (klik card Baru/Aktif/Resign di dashboard) -->
+<div class="modal-overlay" id="modalStatusList">
+  <div class="modal" style="width: 720px;">
+    <div class="modal-header">
+      <h2 id="statusListTitle">Daftar Karyawan</h2>
+      <button class="modal-close" onclick="closeModal('modalStatusList')">✕</button>
+    </div>
+    <input type="text" class="form-control" id="searchStatusList" placeholder="🔍 Cari NIP, Nama, SBU..." style="margin-bottom:14px;" oninput="Handlers.renderStatusListModal()">
+    <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+      <table>
+        <thead><tr><th>NIP</th><th>Nama</th><th>Jabatan</th><th>SBU</th><th>Tgl Masuk</th></tr></thead>
+        <tbody id="statusListBody"></tbody>
+      </table>
+    </div>
+    <div class="flex-end" style="margin-top: 16px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalStatusList')">Tutup</button>
     </div>
   </div>
 </div>
