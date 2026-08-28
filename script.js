@@ -227,7 +227,7 @@ const Models = {
       SBU:     Utils.resolveSBU(String(data.SBU || '').trim()),
       Jabatan: Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       Bulan:   String(data.Bulan || '').trim(),
-      Tagihan: String(data.Tagihan || '').trim() // "SPPD 1 2" | "Lembur"
+      Tagihan: Utils.normalizeTagihan(data.Tagihan) // "SPPD 1 2" | "Lembur"
     };
   }
 };
@@ -457,6 +457,13 @@ const Utils = {
     const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   },
+  // ✅ BARU: Normalisasi nilai Tagihan — mis. "SPPD 1"/"SPPD 2"/"sppd" lama otomatis jadi "SPPD 1 2"
+  normalizeTagihan(val) {
+    const s = String(val || '').trim();
+    if (/^sppd/i.test(s)) return 'SPPD 1 2';
+    if (/^lembur$/i.test(s)) return 'Lembur';
+    return s;
+  },
   fillSelect(id, options) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -499,7 +506,8 @@ const DB = {
         ? data.slotConfig
         : {};
       // ✅ BARU: Data Lembur & SPPD Karyawan + konfigurasi Dashboard Non PO
-      AppState.lembur = Array.isArray(data.lembur) ? data.lembur : [];
+      // Migrasi otomatis: tag lama "SPPD 1"/"SPPD 2" disatukan jadi "SPPD 1 2" agar cocok dengan filter terbaru
+      AppState.lembur = (Array.isArray(data.lembur) ? data.lembur : []).map(l => Models.Lembur(l));
       AppState.lemburSbuConfig = data.lemburSbuConfig && typeof data.lemburSbuConfig === 'object' ? data.lemburSbuConfig : {};
       AppState.tiketHPI = Number(data.tiketHPI) || 0;
 
@@ -1260,12 +1268,13 @@ const UI = {
 
     Utils.fillSelect('filterLemburSBU', CONFIG.DEFAULT_SBU);
     Utils.fillSelect('filterLemburBulan', [...new Set(lembur.map(l => l.Bulan))].filter(Boolean).sort());
+    Utils.fillSelect('filterLemburTagihan', CONFIG.TAGIHAN_OPTIONS); // ✅ DIUBAH: satu sumber nilai dgn data, hindari mismatch
 
     const filtered = lembur.filter(l =>
       (!q || l.NIP.toLowerCase().includes(q) || l.Nama.toLowerCase().includes(q)) &&
       (!fSBU || l.SBU === fSBU) &&
       (!fBulan || l.Bulan === fBulan) &&
-      (!fTag || l.Tagihan === fTag)
+      (!fTag || Utils.normalizeTagihan(l.Tagihan) === Utils.normalizeTagihan(fTag)) // ✅ DIUBAH: bandingkan versi ternormalisasi
     );
 
     const tbody = document.getElementById('lemburBody');
@@ -1321,13 +1330,16 @@ const UI = {
 
       const entriesSBU = AppState.lembur.filter(l => l.SBU === sbu);
       const jumlahKaryawan = new Set(entriesSBU.map(l => l.NIP)).size; // poin 3.vi
-      const realisasi = entriesSBU.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0); // poin 3.vii
+      // ✅ BARU: rincian per jenis Tagihan agar jelas — 1 NIP bisa punya SPPD 1 2 & Lembur sekaligus
+      const realisasiSPPD = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'SPPD 1 2').reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
+      const realisasiLembur = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'Lembur').reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
+      const realisasi = realisasiSPPD + realisasiLembur; // poin 3.vii — total gabungan SPPD + Lembur (sesuai spesifikasi)
       totalRealisasi += realisasi;
 
       const realisasiMaxTopupPct = maxTopupPerBulan !== 0 ? (realisasi / maxTopupPerBulan) * 100 : 0; // poin 3.viii
       const persentase = paguPerBulanStatic !== 0 ? (realisasi / paguPerBulanStatic) * 100 : 0;        // poin 3.x
 
-      return { sbu, cfg, paguPerUnit, bnlpPerBulan, maxTopupPerBulan, jumlahKaryawan, realisasi, realisasiMaxTopupPct, paguPerBulanStatic, persentase };
+      return { sbu, cfg, paguPerUnit, bnlpPerBulan, maxTopupPerBulan, jumlahKaryawan, realisasiSPPD, realisasiLembur, realisasi, realisasiMaxTopupPct, paguPerBulanStatic, persentase };
     });
 
     const tiketHPI = Number(AppState.tiketHPI) || 0;
@@ -1368,7 +1380,7 @@ const UI = {
             <thead><tr>
               <th>SBU</th><th>PAGU Non PO (Tahunan)</th><th>PAGU/Unit sblm Man Fee</th>
               <th>BNLP (Tahunan)</th><th>BNLP/Bulan</th><th>Max Topup/Bulan</th>
-              <th>Jml Karyawan</th><th>Realisasi SPPD/Lembur</th><th>Realisasi/Max Topup</th>
+              <th>Jml Karyawan</th><th>Realisasi SPPD 1 2</th><th>Realisasi Lembur</th><th>Realisasi SPPD/Lembur</th><th>Realisasi/Max Topup</th>
               <th>PAGU/Bulan</th><th>Persentase</th>
             </tr></thead>
             <tbody>
@@ -1383,7 +1395,9 @@ const UI = {
                   <td class="mono">${Utils.formatRupiah(r.bnlpPerBulan)}</td>
                   <td class="mono">${Utils.formatRupiah(r.maxTopupPerBulan)}</td>
                   <td class="mono" style="text-align:center;">${r.jumlahKaryawan}</td>
-                  <td class="mono">${Utils.formatRupiah(r.realisasi)}</td>
+                  <td class="mono">${Utils.formatRupiah(r.realisasiSPPD)}</td>
+                  <td class="mono">${Utils.formatRupiah(r.realisasiLembur)}</td>
+                  <td class="mono" style="font-weight:600;">${Utils.formatRupiah(r.realisasi)}</td>
                   <td class="mono">${r.realisasiMaxTopupPct.toFixed(1)}%</td>
                   <td class="mono">${Utils.formatRupiah(r.paguPerBulanStatic)}</td>
                   <td class="mono" style="font-weight:700;">${r.persentase.toFixed(1)}%</td>
@@ -2328,7 +2342,9 @@ const Handlers = {
       'BNLP per Bulan': r.bnlpPerBulan,
       'Max Topup per Bulan': r.maxTopupPerBulan,
       'Jumlah Karyawan per SBU': r.jumlahKaryawan,
-      'Realisasi SPPD/Lembur': r.realisasi,
+      'Realisasi SPPD 1 2': r.realisasiSPPD,
+      'Realisasi Lembur': r.realisasiLembur,
+      'Realisasi SPPD/Lembur (Total)': r.realisasi,
       'Realisasi/Max Topup (%)': Number(r.realisasiMaxTopupPct.toFixed(2)),
       'PAGU per Bulan': r.paguPerBulanStatic,
       'Persentase (%)': Number(r.persentase.toFixed(2))
