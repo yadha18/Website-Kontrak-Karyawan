@@ -464,6 +464,19 @@ const Utils = {
     if (/^lembur$/i.test(s)) return 'Lembur';
     return s;
   },
+  // ✅ BARU: Cari karyawan berdasarkan NIP — dengan fallback toleran angka 0 di depan.
+  // Kasus nyata: NIP di Excel Karyawan tersimpan sebagai teks ("0012345678"), tapi di Excel
+  // Lembur/SPPD kolom NIP kebetulan berformat angka sehingga 0 di depan hilang ("12345678").
+  // Exact match akan gagal walau datanya sama — fallback ini menyamakan keduanya.
+  findKaryawanByNIP(nip) {
+    const s = String(nip || '').trim();
+    if (!s) return null;
+    let emp = AppState.karyawan.find(k => k.NIP === s);
+    if (emp) return emp;
+    const stripped = s.replace(/^0+/, '');
+    if (!stripped) return null;
+    return AppState.karyawan.find(k => k.NIP.replace(/^0+/, '') === stripped) || null;
+  },
   fillSelect(id, options) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -508,6 +521,14 @@ const DB = {
       // ✅ BARU: Data Lembur & SPPD Karyawan + konfigurasi Dashboard Non PO
       // Migrasi otomatis: tag lama "SPPD 1"/"SPPD 2" disatukan jadi "SPPD 1 2" agar cocok dengan filter terbaru
       AppState.lembur = (Array.isArray(data.lembur) ? data.lembur : []).map(l => Models.Lembur(l));
+      // ✅ BARU: Re-sync Nama/SBU/Jabatan yang kosong — untuk data lama yang gagal ke-lookup saat upload
+      // (mis. NIP di Excel Lembur kehilangan angka 0 di depan). Sekarang dicoba ulang pakai fallback NIP.
+      AppState.lembur.forEach(l => {
+        if (!l.SBU || !l.Nama) {
+          const emp = Utils.findKaryawanByNIP(l.NIP);
+          if (emp) { l.Nama = emp.Nama; l.SBU = emp.SBU; l.Jabatan = emp.Jabatan; }
+        }
+      });
       AppState.lemburSbuConfig = data.lemburSbuConfig && typeof data.lemburSbuConfig === 'object' ? data.lemburSbuConfig : {};
       AppState.tiketHPI = Number(data.tiketHPI) || 0;
 
@@ -819,7 +840,7 @@ const EmployeeService = {
 const LemburService = {
   // Ambil Nama, SBU, Jabatan dari Data Karyawan berdasarkan NIP — file upload cukup berisi NIP
   enrichFromKaryawan(row) {
-    const emp = AppState.karyawan.find(k => k.NIP === String(row.NIP || '').trim());
+    const emp = Utils.findKaryawanByNIP(row.NIP);
     return {
       NIP: row.NIP,
       Nama: emp ? emp.Nama : '',
@@ -2233,7 +2254,7 @@ const Handlers = {
   // ✅ BARU: Auto-lookup Nama/SBU/Jabatan dari Data Karyawan berdasarkan NIP yang diketik
   lookupLemburNIP() {
     const nip = document.getElementById('lemburNIP').value.trim();
-    const emp = AppState.karyawan.find(k => k.NIP === nip);
+    const emp = Utils.findKaryawanByNIP(nip);
     document.getElementById('lemburNamaPreview').value = emp ? emp.Nama : '';
     document.getElementById('lemburSBUPreview').value = emp ? emp.SBU : '';
     document.getElementById('lemburJabatanPreview').value = emp ? emp.Jabatan : '';
@@ -2251,7 +2272,7 @@ const Handlers = {
     if (!nominal || nominal <= 0) return Utils.toast('❌ Nominal harus lebih dari 0!');
     if (!bulan) return Utils.toast('❌ Bulan wajib diisi!');
 
-    const emp = AppState.karyawan.find(k => k.NIP === nip);
+    const emp = Utils.findKaryawanByNIP(nip);
     const enriched = { NIP: nip, Nominal: nominal, Bulan: bulan, Tagihan: tagihan,
       Nama: emp ? emp.Nama : '', SBU: emp ? emp.SBU : '', Jabatan: emp ? emp.Jabatan : '' };
 
