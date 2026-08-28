@@ -134,7 +134,7 @@ const CONFIG = {
   UKURAN_BAJU: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
 
   // ✅ BARU: Konfigurasi Dashboard Non PO (Data Lembur & SPPD Karyawan)
-  TAGIHAN_OPTIONS: ['SPPD 1', 'SPPD 2', 'Lembur'],
+  TAGIHAN_OPTIONS: ['SPPD 1 2', 'Lembur'],
   PAGU_PER_BULAN_STATIC: 15000000, // angka statis per SBU (poin 9)
   MAN_FEE_PERSEN: 0.07             // 7% dari Total Realisasi (poin 4)
 
@@ -227,7 +227,7 @@ const Models = {
       SBU:     Utils.resolveSBU(String(data.SBU || '').trim()),
       Jabatan: Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       Bulan:   String(data.Bulan || '').trim(),
-      Tagihan: String(data.Tagihan || '').trim() // "SPPD 1" | "SPPD 2" | "Lembur"
+      Tagihan: String(data.Tagihan || '').trim() // "SPPD 1 2" | "Lembur"
     };
   }
 };
@@ -1286,7 +1286,7 @@ const UI = {
     const startIdx = (lemburPagination.page - 1) * lemburPagination.size;
     const paginated = filtered.slice(startIdx, startIdx + lemburPagination.size);
 
-    const tagPill = { 'SPPD 1': 'pill-blue', 'SPPD 2': 'pill-purple', 'Lembur': 'pill-yellow' };
+    const tagPill = { 'SPPD 1 2': 'pill-blue', 'Lembur': 'pill-yellow' };
 
     tbody.innerHTML = paginated.map(l => `
       <tr>
@@ -1521,7 +1521,7 @@ const Handlers = {
       desc.innerHTML = AppState.uploadDataType === 'karyawan'
         ? `Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.<br>
            🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> NIP yang sudah terdaftar akan otomatis dilewati.`
-        : `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (isi: "SPPD 1", "SPPD 2", atau "Lembur").<br>
+        : `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (isi: "SPPD 1 2", atau "Lembur").<br>
            ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari Data Karyawan berdasarkan NIP — cukup isi NIP di file Excel.`;
     }
     this.cancelUpload();
@@ -2188,7 +2188,7 @@ const Handlers = {
       document.getElementById('lemburNIP').value = '';
       document.getElementById('lemburNominal').value = '';
       document.getElementById('lemburBulan').value = '';
-      document.getElementById('lemburTagihan').value = 'SPPD 1';
+      document.getElementById('lemburTagihan').value = 'SPPD 1 2';
     }
     this.lookupLemburNIP();
     document.getElementById('modalEditLembur').classList.add('open');
