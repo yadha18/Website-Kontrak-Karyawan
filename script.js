@@ -223,7 +223,7 @@ const Models = {
       id:      data.id || Utils.generateId(),
       NIP:     String(data.NIP || '').trim(),
       Nama:    String(data.Nama || '').trim(),
-      Nominal: Number(data.Nominal) || 0,
+      Nominal: Utils.parseNominal(data.Nominal),
       SBU:     Utils.resolveSBU(String(data.SBU || '').trim()),
       Jabatan: Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       Bulan:   String(data.Bulan || '').trim(),
@@ -432,6 +432,30 @@ const Utils = {
   formatRupiah(num) {
     const n = Number(num) || 0;
     return 'Rp' + Math.round(n).toLocaleString('id-ID');
+  },
+  // ✅ BARU: Parser nominal yang aman untuk format Indonesia (titik ribuan / koma desimal) dan angka Excel biasa
+  parseNominal(v) {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'number') return v;
+    let s = String(v).trim();
+    if (!s) return 0;
+    s = s.replace(/rp\.?/gi, '').replace(/\s/g, '');
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+    if (lastComma > -1 && lastDot > -1) {
+      // Ada dua-duanya: pemisah paling kanan dianggap desimal, sisanya ribuan
+      if (lastComma > lastDot) s = s.replace(/\./g, '').replace(',', '.');
+      else s = s.replace(/,/g, '');
+    } else if (lastComma > -1) {
+      // Hanya koma: 3 digit di belakang = pemisah ribuan (mis. 1,500,000), selain itu = desimal
+      s = (s.length - lastComma - 1 === 3) ? s.replace(/,/g, '') : s.replace(',', '.');
+    } else if (lastDot > -1) {
+      // Hanya titik: 3 digit di belakang = pemisah ribuan ala Indonesia (mis. 1.500.000)
+      if (s.length - lastDot - 1 === 3) s = s.replace(/\./g, '');
+    }
+    s = s.replace(/[^0-9.\-]/g, '');
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
   },
   fillSelect(id, options) {
     const el = document.getElementById(id);
@@ -802,7 +826,7 @@ const LemburService = {
   classifyUploadRows(rows) {
     return rows.map(raw => {
       const nip = String(raw.NIP || '').trim();
-      const nominal = Number(String(raw.Nominal || '').replace(/[^0-9.-]/g, ''));
+      const nominal = Utils.parseNominal(raw.Nominal);
       let status;
       if (!nip) status = 'invalid_nip';
       else if (!nominal || isNaN(nominal)) status = 'invalid_nominal';
@@ -1624,7 +1648,10 @@ const Handlers = {
 
     document.getElementById('previewHead').innerHTML = '<th>Status</th>' + COLS.map(c => `<th>${c}</th>`).join('');
     document.getElementById('previewBody').innerHTML = classified.slice(0, 50).map(r => `
-      <tr ${rowClass[r.__uploadStatus]}><td>${statusBadge[r.__uploadStatus]}</td>${COLS.map(c => `<td class="${c === 'NIP' ? 'mono' : ''}">${r[c]}</td>`).join('')}</tr>
+      <tr ${rowClass[r.__uploadStatus]}><td>${statusBadge[r.__uploadStatus]}</td>${COLS.map(c => {
+        const val = c === 'Nominal' ? Utils.formatRupiah(Utils.parseNominal(r[c])) : r[c];
+        return `<td class="${c === 'NIP' ? 'mono' : ''}">${val}</td>`;
+      }).join('')}</tr>
     `).join('') + (classified.length > 50 ? `<tr><td colspan="${COLS.length + 1}" style="text-align:center;color:var(--text2);">... dan ${classified.length - 50} baris lainnya</td></tr>` : '');
 
     document.getElementById('previewCard').style.display = 'block';
@@ -2180,7 +2207,7 @@ const Handlers = {
   // ✅ BARU: Simpan data Lembur/SPPD manual (tambah baru atau edit), dicatat ke log "lembur"
   saveLemburManual() {
     const nip = document.getElementById('lemburNIP').value.trim();
-    const nominal = Number(document.getElementById('lemburNominal').value);
+    const nominal = Utils.parseNominal(document.getElementById('lemburNominal').value);
     const bulan = document.getElementById('lemburBulan').value.trim();
     const tagihan = document.getElementById('lemburTagihan').value;
 
