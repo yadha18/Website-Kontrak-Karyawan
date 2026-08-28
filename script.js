@@ -1320,15 +1320,22 @@ const UI = {
     const sbuList = CONFIG.DEFAULT_SBU; // 10 SBU + 1 Pusat
     if (!AppState.lemburSbuConfig) AppState.lemburSbuConfig = {};
 
-    let totalRealisasi = 0;
-    const rows = sbuList.map(sbu => {
+    // ✅ BARU: label khusus untuk data yang SBU-nya tidak cocok satupun dari 11 SBU resmi
+    // (mis. NIP tidak ditemukan di Data Karyawan saat upload, atau nama SBU tidak dikenali) —
+    // sebelumnya baris seperti ini hilang begitu saja dari Dashboard Non PO.
+    const LAINNYA = '⚠️ SBU Tidak Dikenal / Kosong';
+
+    const buildRow = (sbu) => {
       const cfg = AppState.lemburSbuConfig[sbu] || { paguNonPO: 0, bnlp: 0 };
       const paguPerUnit = (Number(cfg.paguNonPO) || 0) / 12;         // poin 3.ii
       const bnlpPerBulan = (Number(cfg.bnlp) || 0) / 12;             // poin 3.iv
       const paguPerBulanStatic = CONFIG.PAGU_PER_BULAN_STATIC;       // poin 3.ix
       const maxTopupPerBulan = bnlpPerBulan - paguPerBulanStatic;    // poin 3.v
 
-      const entriesSBU = AppState.lembur.filter(l => l.SBU === sbu);
+      const entriesSBU = sbu === LAINNYA
+        ? AppState.lembur.filter(l => !sbuList.includes(l.SBU)) // tangkap semua yang tidak cocok 11 SBU resmi
+        : AppState.lembur.filter(l => l.SBU === sbu);
+
       // ✅ DIUBAH: dihitung per pengajuan (baris), bukan NIP unik — 1 karyawan boleh punya beberapa pengajuan SPPD/Lembur
       const entriesSPPD = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'SPPD 1 2');
       const entriesLembur = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'Lembur');
@@ -1339,13 +1346,19 @@ const UI = {
       const realisasiSPPD = entriesSPPD.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
       const realisasiLembur = entriesLembur.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
       const realisasi = realisasiSPPD + realisasiLembur; // poin 3.vii — total gabungan SPPD + Lembur (sesuai spesifikasi)
-      totalRealisasi += realisasi;
 
       const realisasiMaxTopupPct = maxTopupPerBulan !== 0 ? (realisasi / maxTopupPerBulan) * 100 : 0; // poin 3.viii
       const persentase = paguPerBulanStatic !== 0 ? (realisasi / paguPerBulanStatic) * 100 : 0;        // poin 3.x
 
       return { sbu, cfg, paguPerUnit, bnlpPerBulan, maxTopupPerBulan, jumlahKaryawan, jumlahKaryawanSPPD, jumlahKaryawanLembur, realisasiSPPD, realisasiLembur, realisasi, realisasiMaxTopupPct, paguPerBulanStatic, persentase };
-    });
+    };
+
+    const rows = sbuList.map(buildRow);
+    const lainnyaRow = buildRow(LAINNYA);
+    if (lainnyaRow.jumlahKaryawan > 0) rows.push(lainnyaRow); // hanya tampil kalau memang ada datanya
+
+    let totalRealisasi = 0;
+    rows.forEach(r => { totalRealisasi += r.realisasi; });
 
     const tiketHPI = Number(AppState.tiketHPI) || 0;
     const manFee = totalRealisasi * CONFIG.MAN_FEE_PERSEN;
@@ -1391,9 +1404,11 @@ const UI = {
             <tbody>
               ${rows.map(r => {
                 const sbuEsc = r.sbu.replace(/'/g, "\\'");
+                const isLainnya = r.sbu.startsWith('⚠️');
+                const rowStyle = isLainnya ? ' style="background:rgba(239,68,68,.06);"' : '';
                 return `
-                <tr>
-                  <td style="white-space:nowrap;font-weight:500;">${r.sbu}</td>
+                <tr${rowStyle}>
+                  <td style="white-space:nowrap;font-weight:500;${isLainnya ? 'color:var(--danger);' : ''}">${r.sbu}</td>
                   <td><input type="number" min="0" class="form-control mono" style="min-width:130px" value="${r.cfg.paguNonPO || 0}" onchange="Handlers.updateLemburConfig('${sbuEsc}','paguNonPO',this.value)"></td>
                   <td class="mono">${Utils.formatRupiah(r.paguPerUnit)}</td>
                   <td><input type="number" min="0" class="form-control mono" style="min-width:130px" value="${r.cfg.bnlp || 0}" onchange="Handlers.updateLemburConfig('${sbuEsc}','bnlp',this.value)"></td>
