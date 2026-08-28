@@ -1329,17 +1329,22 @@ const UI = {
       const maxTopupPerBulan = bnlpPerBulan - paguPerBulanStatic;    // poin 3.v
 
       const entriesSBU = AppState.lembur.filter(l => l.SBU === sbu);
-      const jumlahKaryawan = new Set(entriesSBU.map(l => l.NIP)).size; // poin 3.vi
+      // ✅ DIUBAH: dihitung per pengajuan (baris), bukan NIP unik — 1 karyawan boleh punya beberapa pengajuan SPPD/Lembur
+      const entriesSPPD = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'SPPD 1 2');
+      const entriesLembur = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'Lembur');
+      const jumlahKaryawanSPPD = entriesSPPD.length;
+      const jumlahKaryawanLembur = entriesLembur.length;
+      const jumlahKaryawan = entriesSBU.length; // poin 3.vi — total pengajuan SPPD + Lembur di SBU ini
       // ✅ BARU: rincian per jenis Tagihan agar jelas — 1 NIP bisa punya SPPD 1 2 & Lembur sekaligus
-      const realisasiSPPD = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'SPPD 1 2').reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
-      const realisasiLembur = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'Lembur').reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
+      const realisasiSPPD = entriesSPPD.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
+      const realisasiLembur = entriesLembur.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
       const realisasi = realisasiSPPD + realisasiLembur; // poin 3.vii — total gabungan SPPD + Lembur (sesuai spesifikasi)
       totalRealisasi += realisasi;
 
       const realisasiMaxTopupPct = maxTopupPerBulan !== 0 ? (realisasi / maxTopupPerBulan) * 100 : 0; // poin 3.viii
       const persentase = paguPerBulanStatic !== 0 ? (realisasi / paguPerBulanStatic) * 100 : 0;        // poin 3.x
 
-      return { sbu, cfg, paguPerUnit, bnlpPerBulan, maxTopupPerBulan, jumlahKaryawan, realisasiSPPD, realisasiLembur, realisasi, realisasiMaxTopupPct, paguPerBulanStatic, persentase };
+      return { sbu, cfg, paguPerUnit, bnlpPerBulan, maxTopupPerBulan, jumlahKaryawan, jumlahKaryawanSPPD, jumlahKaryawanLembur, realisasiSPPD, realisasiLembur, realisasi, realisasiMaxTopupPct, paguPerBulanStatic, persentase };
     });
 
     const tiketHPI = Number(AppState.tiketHPI) || 0;
@@ -1380,7 +1385,7 @@ const UI = {
             <thead><tr>
               <th>SBU</th><th>PAGU Non PO (Tahunan)</th><th>PAGU/Unit sblm Man Fee</th>
               <th>BNLP (Tahunan)</th><th>BNLP/Bulan</th><th>Max Topup/Bulan</th>
-              <th>Jml Karyawan</th><th>Realisasi SPPD 1 2</th><th>Realisasi Lembur</th><th>Realisasi SPPD/Lembur</th><th>Realisasi/Max Topup</th>
+              <th>Jml Karyawan SPPD</th><th>Jml Karyawan Lembur</th><th>Total Pengajuan</th><th>Realisasi SPPD 1 2</th><th>Realisasi Lembur</th><th>Realisasi SPPD/Lembur</th><th>Realisasi/Max Topup</th>
               <th>PAGU/Bulan</th><th>Persentase</th>
             </tr></thead>
             <tbody>
@@ -1394,7 +1399,9 @@ const UI = {
                   <td><input type="number" min="0" class="form-control mono" style="min-width:130px" value="${r.cfg.bnlp || 0}" onchange="Handlers.updateLemburConfig('${sbuEsc}','bnlp',this.value)"></td>
                   <td class="mono">${Utils.formatRupiah(r.bnlpPerBulan)}</td>
                   <td class="mono">${Utils.formatRupiah(r.maxTopupPerBulan)}</td>
-                  <td class="mono" style="text-align:center;">${r.jumlahKaryawan}</td>
+                  <td class="mono" style="text-align:center;">${r.jumlahKaryawanSPPD}</td>
+                  <td class="mono" style="text-align:center;">${r.jumlahKaryawanLembur}</td>
+                  <td class="mono" style="text-align:center;font-weight:600;">${r.jumlahKaryawan}</td>
                   <td class="mono">${Utils.formatRupiah(r.realisasiSPPD)}</td>
                   <td class="mono">${Utils.formatRupiah(r.realisasiLembur)}</td>
                   <td class="mono" style="font-weight:600;">${Utils.formatRupiah(r.realisasi)}</td>
@@ -2341,7 +2348,9 @@ const Handlers = {
       'BNLP (Tahunan)': r.cfg.bnlp || 0,
       'BNLP per Bulan': r.bnlpPerBulan,
       'Max Topup per Bulan': r.maxTopupPerBulan,
-      'Jumlah Karyawan per SBU': r.jumlahKaryawan,
+      'Jumlah Karyawan SPPD 1 2': r.jumlahKaryawanSPPD,
+      'Jumlah Karyawan Lembur': r.jumlahKaryawanLembur,
+      'Total Pengajuan per SBU': r.jumlahKaryawan,
       'Realisasi SPPD 1 2': r.realisasiSPPD,
       'Realisasi Lembur': r.realisasiLembur,
       'Realisasi SPPD/Lembur (Total)': r.realisasi,
