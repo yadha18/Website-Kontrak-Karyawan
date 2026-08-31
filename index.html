@@ -40,8 +40,24 @@
     <button class="nav-item" onclick="navigate('karyawan')"><span class="icon">👥</span> Tabel Data Karyawan</button>
 
     <div class="nav-label">Data Lembur dan SPPD Karyawan</div>
-    <button class="nav-item" onclick="navigate('dashboard-nonpo')"><span class="icon">📈</span> Dashboard Non PO</button>
-    <button class="nav-item" onclick="navigate('lembur')"><span class="icon">🧾</span> Tabel Lembur & SPPD</button>
+    <button class="nav-item" onclick="Handlers.toggleTahunLembur()" style="justify-content:space-between;">
+      <span><span class="icon">📅</span> 2026</span>
+      <span id="tahunLemburArrow" style="font-size:11px;">▸</span>
+    </button>
+    <div id="menuBulanLembur" style="display:none;">
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Januari 2026')">Januari</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Februari 2026')">Februari</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Maret 2026')">Maret</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('April 2026')">April</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Mei 2026')">Mei</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Juni 2026')">Juni</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Juli 2026')">Juli</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Agustus 2026')">Agustus</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('September 2026')">September</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Oktober 2026')">Oktober</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('November 2026')">November</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Desember 2026')">Desember</button>
+    </div>
 
     <!-- <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button> -->
     <div class="nav-label">Pengaturan</div>
@@ -273,68 +289,73 @@
       </div>
     </div>
 
-    <!-- ✅ BARU: Dashboard Non PO (submenu Data Lembur dan SPPD Karyawan) -->
-    <div class="page" id="page-dashboard-nonpo">
+    <!-- ✅ DIUBAH: Dashboard Non PO + Tabel Lembur & SPPD digabung jadi 1 halaman per-bulan (dipilih dari menu "2026" di sidebar) -->
+    <div class="page" id="page-lembur-bulan">
       <div class="page-header">
-        <h1>Dashboard Non PO</h1>
-        <p>Ringkasan PAGU, BNLP, dan realisasi SPPD/Lembur per SBU.</p>
+        <h1 id="lemburBulanTitle">📅 Data Lembur & SPPD</h1>
+        <p>Breakdown per bulan — pilih bulan lain lewat menu "2026" di samping.</p>
       </div>
-      <div class="card" id="nonpo-summary-card"></div>
-      <div class="card">
-        <div class="card-title">📊 Rincian PAGU &amp; Realisasi per SBU</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">ℹ️ Kolom <strong>PAGU Non PO</strong> dan <strong>BNLP</strong> diisi manual (nilai tahunan) — kolom lainnya dihitung otomatis. Baris <strong style="color:var(--danger)">⚠️ SBU Tidak Dikenal/Kosong</strong> otomatis muncul jika ada data lembur/SPPD yang SBU-nya tidak cocok 11 SBU resmi (mis. NIP belum terdaftar di Data Karyawan saat upload) — perbarui NIP karyawan tsb agar masuk ke SBU yang benar.</p>
-        <div id="nonpo-table"></div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;">
+        <button class="btn btn-primary" id="tabBtnDashboard" onclick="Handlers.setLemburViewTab('dashboard')">📈 Dashboard Non PO</button>
+        <button class="btn btn-secondary" id="tabBtnTabel" onclick="Handlers.setLemburViewTab('tabel')">🧾 Tabel Data</button>
       </div>
-      <!-- ✅ BARU: Log Perubahan khusus Data Lembur & SPPD (terpisah dari log Data Karyawan) -->
-      <div class="card">
-        <div class="card-title">🔄 Review Log Perubahan — Data Lembur &amp; SPPD</div>
-        <div id="lembur-log-table"></div>
+
+      <!-- Tab: Dashboard Non PO -->
+      <div id="lemburBulanDashboardView">
+        <div class="card" id="nonpo-summary-card"></div>
+        <div class="card">
+          <div class="card-title">📊 Rincian PAGU &amp; Realisasi per SBU</div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">ℹ️ Kolom <strong>PAGU Non PO</strong> dan <strong>BNLP</strong> diisi manual (nilai tahunan) — kolom lainnya dihitung otomatis.</p>
+          <div id="nonpo-table"></div>
+        </div>
+        <!-- ✅ BARU: Log Perubahan khusus Data Lembur & SPPD (terpisah dari log Data Karyawan) -->
+        <div class="card">
+          <div class="card-title">🔄 Review Log Perubahan — Data Lembur &amp; SPPD</div>
+          <div id="lembur-log-table"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Tabel Data Lembur & SPPD -->
+      <div id="lemburBulanTabelView" style="display:none;">
+        <div class="flex-end" style="margin-bottom:12px;gap:10px;">
+          <button class="btn btn-danger" onclick="Handlers.openModalHapusSemuaLembur()">🗑 Hapus Semua Data</button>
+          <button class="btn btn-primary" onclick="openModalLembur(null)">➕ Tambah Data Manual</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="searchLembur" placeholder="🔍  Cari NIP atau Nama..." oninput="resetLemburPageAndRender()">
+          <select id="filterLemburSBU" onchange="resetLemburPageAndRender()"><option value="">Semua SBU</option></select>
+          <select id="filterLemburTagihan" onchange="resetLemburPageAndRender()">
+            <option value="">Semua Tagihan</option>
+            <option value="SPPD 1 2">SPPD 1 2</option>
+            <option value="Lembur">Lembur</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>Nominal</th><th>SBU</th><th>Jabatan</th><th>Bulan</th><th>Tagihan</th></tr></thead>
+            <tbody id="lemburBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination-container" id="paginationLembur" style="display: none;">
+          <div class="page-info">
+            Menampilkan
+            <select id="lemburPageSize" onchange="changeLemburPageSize()">
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+            data per halaman. Total: <span id="totalLemburData" style="font-weight:600;color:var(--text)">0</span> data.
+          </div>
+          <div class="page-controls" id="lemburPageControls"></div>
+        </div>
+        <div class="flex-end">
+          <button class="btn btn-success" onclick="exportLemburExcel()">⬇ Export Excel Data Lembur &amp; SPPD</button>
+        </div>
       </div>
     </div>
 
-    <!-- ✅ BARU: Tabel Data Lembur dan SPPD Karyawan (submenu Data Lembur dan SPPD Karyawan) -->
-    <div class="page" id="page-lembur">
-      <div class="page-header">
-        <h1>Tabel Data Lembur dan SPPD Karyawan</h1>
-        <p>Data lembur dan SPPD yang sudah diupload. Nama, SBU, dan Jabatan diambil otomatis dari Data Karyawan.</p>
-      </div>
-      <div class="flex-end" style="margin-bottom:12px;gap:10px;">
-        <button class="btn btn-danger" onclick="Handlers.openModalHapusSemuaLembur()">🗑 Hapus Semua Data</button>
-        <button class="btn btn-primary" onclick="openModalLembur(null)">➕ Tambah Data Manual</button>
-      </div>
-      <div class="search-bar">
-        <input type="text" id="searchLembur" placeholder="🔍  Cari NIP atau Nama..." oninput="resetLemburPageAndRender()">
-        <select id="filterLemburSBU" onchange="resetLemburPageAndRender()"><option value="">Semua SBU</option></select>
-        <select id="filterLemburBulan" onchange="resetLemburPageAndRender()"><option value="">Semua Bulan</option></select>
-        <select id="filterLemburTagihan" onchange="resetLemburPageAndRender()">
-          <option value="">Semua Tagihan</option>
-          <option value="SPPD 1 2">SPPD 1 2</option>
-          <option value="Lembur">Lembur</option>
-        </select>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>Nominal</th><th>SBU</th><th>Jabatan</th><th>Bulan</th><th>Tagihan</th></tr></thead>
-          <tbody id="lemburBody"></tbody>
-        </table>
-      </div>
-      <div class="pagination-container" id="paginationLembur" style="display: none;">
-        <div class="page-info">
-          Menampilkan
-          <select id="lemburPageSize" onchange="changeLemburPageSize()">
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-          data per halaman. Total: <span id="totalLemburData" style="font-weight:600;color:var(--text)">0</span> data.
-        </div>
-        <div class="page-controls" id="lemburPageControls"></div>
-      </div>
-      <div class="flex-end">
-        <button class="btn btn-success" onclick="exportLemburExcel()">⬇ Export Excel Data Lembur &amp; SPPD</button>
-      </div>
-    </div>
 
     <div class="page" id="page-pindah">
       <div class="page-header">
@@ -594,12 +615,12 @@
 <div class="modal-overlay" id="modalConfirmDeleteAllLembur">
   <div class="modal" style="width: 480px;">
     <div class="modal-header">
-      <h2>🗑 Hapus Semua Data Lembur &amp; SPPD</h2>
+      <h2>🗑 Hapus Semua Data Lembur &amp; SPPD (Bulan Ini)</h2>
       <button class="modal-close" onclick="closeModal('modalConfirmDeleteAllLembur')">✕</button>
     </div>
 
     <div class="info-note" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:var(--danger);margin-bottom:20px;">
-      ⚠️ <strong>Peringatan keras!</strong> Seluruh data lembur & SPPD akan dihapus permanen dan tidak dapat dikembalikan.
+      ⚠️ <strong>Peringatan keras!</strong> Seluruh data lembur & SPPD pada bulan yang sedang dibuka akan dihapus permanen dan tidak dapat dikembalikan. Bulan lain tidak terpengaruh.
     </div>
 
     <div class="card" style="background:var(--surface2);border-color:var(--border2);margin-bottom:20px;">
@@ -780,7 +801,20 @@
       </div>
       <div class="form-group">
         <label class="form-label">Bulan <span style="color:var(--danger)">*</span></label>
-        <input type="text" class="form-control" id="lemburBulan" placeholder="cth: Januari 2026">
+        <select class="form-control" id="lemburBulan">
+          <option value="Januari 2026">Januari 2026</option>
+          <option value="Februari 2026">Februari 2026</option>
+          <option value="Maret 2026">Maret 2026</option>
+          <option value="April 2026">April 2026</option>
+          <option value="Mei 2026">Mei 2026</option>
+          <option value="Juni 2026">Juni 2026</option>
+          <option value="Juli 2026">Juli 2026</option>
+          <option value="Agustus 2026">Agustus 2026</option>
+          <option value="September 2026">September 2026</option>
+          <option value="Oktober 2026">Oktober 2026</option>
+          <option value="November 2026">November 2026</option>
+          <option value="Desember 2026">Desember 2026</option>
+        </select>
       </div>
     </div>
     <div class="form-row">

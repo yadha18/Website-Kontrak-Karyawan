@@ -136,7 +136,12 @@ const CONFIG = {
   // ✅ BARU: Konfigurasi Dashboard Non PO (Data Lembur & SPPD Karyawan)
   TAGIHAN_OPTIONS: ['SPPD 1 2', 'Lembur'],
   PAGU_PER_BULAN_STATIC: 15000000, // angka statis per SBU (poin 9)
-  MAN_FEE_PERSEN: 0.07             // 7% dari Total Realisasi (poin 4)
+  MAN_FEE_PERSEN: 0.07,            // 7% dari Total Realisasi (poin 4)
+
+  // ✅ BARU: Daftar bulan baku untuk Data Lembur & SPPD Karyawan tahun 2026 (breakdown per bulan di sidebar)
+  BULAN_NAMA: ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],
+  TAHUN_LEMBUR: 2026,
+  get BULAN_OPTIONS() { return this.BULAN_NAMA.map(b => `${b} ${this.TAHUN_LEMBUR}`); }
 
   // ✅ DIHAPUS: SLOT_PER_SBU & TOTAL_SLOT_KARYAWAN statis tidak dipakai lagi.
   // Slot Jabatan per SBU sekarang dibangun otomatis dari data Excel yang
@@ -168,6 +173,8 @@ const AppState = {
   pagination: { page: 1, size: 10 },
   logPagination: { page: 1, size: 10 }, // ✅ BARU: pagination untuk Review Log Perubahan
   lemburPagination: { page: 1, size: 10 }, // ✅ BARU: pagination untuk Tabel Data Lembur dan SPPD Karyawan
+  selectedBulan: null,      // ✅ BARU: bulan yang sedang aktif dipilih dari sidebar (wajib pilih 1 bulan)
+  lemburViewTab: 'dashboard', // ✅ BARU: 'dashboard' | 'tabel' — tab aktif di halaman bulan Lembur & SPPD
   modals: { editTargetId: null, statusTargetId: null, statusListTarget: null, lemburEditId: null },
   slotPanelOpen: {}, // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
   slotJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan, key = "SBU::Jabatan"
@@ -226,7 +233,7 @@ const Models = {
       Nominal: Utils.parseNominal(data.Nominal),
       SBU:     Utils.resolveSBU(String(data.SBU || '').trim()),
       Jabatan: Utils.resolveJabatan(String(data.Jabatan || '').trim()),
-      Bulan:   String(data.Bulan || '').trim(),
+      Bulan:   Utils.normalizeBulan(data.Bulan),
       Tagihan: Utils.normalizeTagihan(data.Tagihan) // "SPPD 1 2" | "Lembur"
     };
   }
@@ -476,6 +483,13 @@ const Utils = {
     const stripped = s.replace(/^0+/, '');
     if (!stripped) return null;
     return AppState.karyawan.find(k => k.NIP.replace(/^0+/, '') === stripped) || null;
+  },
+  // ✅ BARU: Normalisasi nilai Bulan ke format baku "NamaBulan 2026" (mis. "januari", "Jan 2026", "JANUARI" → "Januari 2026")
+  normalizeBulan(val) {
+    const s = String(val || '').trim();
+    if (!s) return '';
+    const found = CONFIG.BULAN_NAMA.find(b => new RegExp('^' + b, 'i').test(s));
+    return found ? `${found} ${CONFIG.TAHUN_LEMBUR}` : s;
   },
   fillSelect(id, options) {
     const el = document.getElementById(id);
@@ -856,9 +870,11 @@ const LemburService = {
     return rows.map(raw => {
       const nip = String(raw.NIP || '').trim();
       const nominal = Utils.parseNominal(raw.Nominal);
+      const bulan = Utils.normalizeBulan(raw.Bulan);
       let status;
       if (!nip) status = 'invalid_nip';
       else if (!nominal || isNaN(nominal)) status = 'invalid_nominal';
+      else if (!CONFIG.BULAN_OPTIONS.includes(bulan)) status = 'invalid_bulan'; // ✅ BARU: Bulan wajib salah satu dari 12 bulan baku 2026
       else status = 'new';
       return { ...raw, __uploadStatus: status };
     });
@@ -873,14 +889,15 @@ const LemburService = {
     const stats = {
       total: classified.length,
       added: toInsert.length,
-      invalid: classified.filter(r => r.__uploadStatus !== 'new').length
+      invalid: classified.filter(r => r.__uploadStatus !== 'new').length,
+      bulanTarget: newRows.length ? newRows[0].Bulan : null // ✅ BARU: dipakai untuk auto-navigate ke bulan terkait
     };
 
     if (stats.total > 0) {
       AppState.log.push(Models.LogChange(
         'SYSTEM', 'SYSTEM', 'lembur upload',
         `${stats.total} baris diproses`,
-        `${stats.added} baru ditambahkan, ${stats.invalid} dilewati (NIP/Nominal tidak valid)`
+        `${stats.added} baru ditambahkan, ${stats.invalid} dilewati (NIP/Nominal/Bulan tidak valid)`
       ));
     }
 
@@ -1279,22 +1296,20 @@ const UI = {
     this.renderPaginationGeneric('logPageControls', AppState.logPagination.page, totalPages, 'Handlers.goToLogPage');
   },
 
-  // ✅ BARU: Render Tabel Data Lembur dan SPPD Karyawan
+  // ✅ DIUBAH: Render Tabel Data Lembur dan SPPD Karyawan — sekarang selalu dibatasi bulan yang dipilih di sidebar
   renderLemburTable() {
     const { lembur, lemburPagination } = AppState;
     const q     = (document.getElementById('searchLembur')?.value || '').toLowerCase();
     const fSBU  = document.getElementById('filterLemburSBU')?.value || '';
-    const fBulan= document.getElementById('filterLemburBulan')?.value || '';
     const fTag  = document.getElementById('filterLemburTagihan')?.value || '';
 
     Utils.fillSelect('filterLemburSBU', CONFIG.DEFAULT_SBU);
-    Utils.fillSelect('filterLemburBulan', [...new Set(lembur.map(l => l.Bulan))].filter(Boolean).sort());
     Utils.fillSelect('filterLemburTagihan', CONFIG.TAGIHAN_OPTIONS); // ✅ DIUBAH: satu sumber nilai dgn data, hindari mismatch
 
     const filtered = lembur.filter(l =>
+      l.Bulan === AppState.selectedBulan && // ✅ BARU: breakdown per bulan (bulan dipilih dari sidebar)
       (!q || l.NIP.toLowerCase().includes(q) || l.Nama.toLowerCase().includes(q)) &&
       (!fSBU || l.SBU === fSBU) &&
-      (!fBulan || l.Bulan === fBulan) &&
       (!fTag || Utils.normalizeTagihan(l.Tagihan) === Utils.normalizeTagihan(fTag)) // ✅ DIUBAH: bandingkan versi ternormalisasi
     );
 
@@ -1341,22 +1356,15 @@ const UI = {
     const sbuList = CONFIG.DEFAULT_SBU; // 10 SBU + 1 Pusat
     if (!AppState.lemburSbuConfig) AppState.lemburSbuConfig = {};
 
-    // ✅ BARU: label khusus untuk data yang SBU-nya tidak cocok satupun dari 11 SBU resmi
-    // (mis. NIP tidak ditemukan di Data Karyawan saat upload, atau nama SBU tidak dikenali) —
-    // sebelumnya baris seperti ini hilang begitu saja dari Dashboard Non PO.
-    const LAINNYA = '⚠️ SBU Tidak Dikenal / Kosong';
-
-    const buildRow = (sbu) => {
+    let totalRealisasi = 0;
+    const rows = sbuList.map(sbu => {
       const cfg = AppState.lemburSbuConfig[sbu] || { paguNonPO: 0, bnlp: 0 };
       const paguPerUnit = (Number(cfg.paguNonPO) || 0) / 12;         // poin 3.ii
       const bnlpPerBulan = (Number(cfg.bnlp) || 0) / 12;             // poin 3.iv
       const paguPerBulanStatic = CONFIG.PAGU_PER_BULAN_STATIC;       // poin 3.ix
       const maxTopupPerBulan = bnlpPerBulan - paguPerBulanStatic;    // poin 3.v
 
-      const entriesSBU = sbu === LAINNYA
-        ? AppState.lembur.filter(l => !sbuList.includes(l.SBU)) // tangkap semua yang tidak cocok 11 SBU resmi
-        : AppState.lembur.filter(l => l.SBU === sbu);
-
+      const entriesSBU = AppState.lembur.filter(l => l.SBU === sbu && l.Bulan === AppState.selectedBulan); // ✅ DIUBAH: breakdown per bulan
       // ✅ DIUBAH: dihitung per pengajuan (baris), bukan NIP unik — 1 karyawan boleh punya beberapa pengajuan SPPD/Lembur
       const entriesSPPD = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'SPPD 1 2');
       const entriesLembur = entriesSBU.filter(l => Utils.normalizeTagihan(l.Tagihan) === 'Lembur');
@@ -1367,19 +1375,13 @@ const UI = {
       const realisasiSPPD = entriesSPPD.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
       const realisasiLembur = entriesLembur.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
       const realisasi = realisasiSPPD + realisasiLembur; // poin 3.vii — total gabungan SPPD + Lembur (sesuai spesifikasi)
+      totalRealisasi += realisasi;
 
       const realisasiMaxTopupPct = maxTopupPerBulan !== 0 ? (realisasi / maxTopupPerBulan) * 100 : 0; // poin 3.viii
       const persentase = paguPerBulanStatic !== 0 ? (realisasi / paguPerBulanStatic) * 100 : 0;        // poin 3.x
 
       return { sbu, cfg, paguPerUnit, bnlpPerBulan, maxTopupPerBulan, jumlahKaryawan, jumlahKaryawanSPPD, jumlahKaryawanLembur, realisasiSPPD, realisasiLembur, realisasi, realisasiMaxTopupPct, paguPerBulanStatic, persentase };
-    };
-
-    const rows = sbuList.map(buildRow);
-    const lainnyaRow = buildRow(LAINNYA);
-    if (lainnyaRow.jumlahKaryawan > 0) rows.push(lainnyaRow); // hanya tampil kalau memang ada datanya
-
-    let totalRealisasi = 0;
-    rows.forEach(r => { totalRealisasi += r.realisasi; });
+    });
 
     const tiketHPI = Number(AppState.tiketHPI) || 0;
     const manFee = totalRealisasi * CONFIG.MAN_FEE_PERSEN;
@@ -1425,11 +1427,9 @@ const UI = {
             <tbody>
               ${rows.map(r => {
                 const sbuEsc = r.sbu.replace(/'/g, "\\'");
-                const isLainnya = r.sbu.startsWith('⚠️');
-                const rowStyle = isLainnya ? ' style="background:rgba(239,68,68,.06);"' : '';
                 return `
-                <tr${rowStyle}>
-                  <td style="white-space:nowrap;font-weight:500;${isLainnya ? 'color:var(--danger);' : ''}">${r.sbu}</td>
+                <tr>
+                  <td style="white-space:nowrap;font-weight:500;">${r.sbu}</td>
                   <td><input type="number" min="0" class="form-control mono" style="min-width:130px" value="${r.cfg.paguNonPO || 0}" onchange="Handlers.updateLemburConfig('${sbuEsc}','paguNonPO',this.value)"></td>
                   <td class="mono">${Utils.formatRupiah(r.paguPerUnit)}</td>
                   <td><input type="number" min="0" class="form-control mono" style="min-width:130px" value="${r.cfg.bnlp || 0}" onchange="Handlers.updateLemburConfig('${sbuEsc}','bnlp',this.value)"></td>
@@ -1547,11 +1547,11 @@ const Handlers = {
       if (n.getAttribute('onclick')?.includes("'" + page + "'")) n.classList.add('active');
     });
 
-    // ✅ BARU: 'dashboard-nonpo' & 'lembur' untuk submenu Data Lembur dan SPPD Karyawan
+    // ✅ DIUBAH: Dashboard Non PO & Tabel Lembur digabung jadi 1 halaman per-bulan (page-lembur-bulan),
+    // dipanggil lewat Handlers.navigateBulan() dari menu sidebar — tidak lagi lewat navigate() biasa.
     const renders = {
       dashboard: 'renderDashboard', karyawan: 'renderKaryawanTable',
-      pindah: 'renderPindahJabatan', jabatan: 'renderJabatanList',
-      'dashboard-nonpo': 'renderDashboardNonPO', lembur: 'renderLemburTable'
+      pindah: 'renderPindahJabatan', jabatan: 'renderJabatanList'
     };
     if (renders[page]) UI[renders[page]]();
     if (page === 'upload') this.setUploadType(AppState.uploadDataType || 'karyawan'); // ✅ BARU
@@ -1559,6 +1559,47 @@ const Handlers = {
   resetPageAndRender() { AppState.pagination.page = 1; UI.renderKaryawanTable(); },
   changePageSize() { AppState.pagination.size = parseInt(document.getElementById('pageSize').value); this.resetPageAndRender(); },
   goToPage(p) { AppState.pagination.page = p; UI.renderKaryawanTable(); },
+
+  // ✅ BARU: Buka/tutup grup menu "2026" (Data Lembur & SPPD) di sidebar
+  toggleTahunLembur() {
+    const el = document.getElementById('menuBulanLembur');
+    const arrow = document.getElementById('tahunLemburArrow');
+    const isOpen = el.style.display !== 'none';
+    el.style.display = isOpen ? 'none' : '';
+    if (arrow) arrow.textContent = isOpen ? '▸' : '▾';
+  },
+
+  // ✅ BARU: Navigasi ke halaman Data Lembur & SPPD untuk 1 bulan tertentu (dipilih dari sidebar "2026")
+  navigateBulan(bulan) {
+    // Pastikan grup "2026" terbuka supaya bulan yang aktif kelihatan
+    const elMonths = document.getElementById('menuBulanLembur');
+    const arrow = document.getElementById('tahunLemburArrow');
+    if (elMonths) elMonths.style.display = '';
+    if (arrow) arrow.textContent = '▾';
+
+    AppState.selectedBulan = bulan;
+    AppState.lemburPagination.page = 1;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-lembur-bulan').classList.add('active');
+    document.querySelectorAll('.nav-item.nav-sub').forEach(n => {
+      if (n.getAttribute('onclick')?.includes("'" + bulan + "'")) n.classList.add('active');
+    });
+    document.getElementById('lemburBulanTitle').textContent = `📅 Data Lembur & SPPD — ${bulan}`;
+    this.setLemburViewTab(AppState.lemburViewTab || 'dashboard');
+  },
+
+  // ✅ BARU: Ganti tab dalam halaman bulan Lembur & SPPD — 'dashboard' (Dashboard Non PO) atau 'tabel' (Tabel Data)
+  setLemburViewTab(tab) {
+    AppState.lemburViewTab = tab;
+    const btnDash = document.getElementById('tabBtnDashboard');
+    const btnTabel = document.getElementById('tabBtnTabel');
+    if (btnDash) btnDash.className = 'btn ' + (tab === 'dashboard' ? 'btn-primary' : 'btn-secondary');
+    if (btnTabel) btnTabel.className = 'btn ' + (tab === 'tabel' ? 'btn-primary' : 'btn-secondary');
+    document.getElementById('lemburBulanDashboardView').style.display = tab === 'dashboard' ? 'block' : 'none';
+    document.getElementById('lemburBulanTabelView').style.display = tab === 'tabel' ? 'block' : 'none';
+    if (tab === 'dashboard') UI.renderDashboardNonPO(); else UI.renderLemburTable();
+  },
 
   // ✅ BARU: Pagination untuk Tabel Data Lembur dan SPPD Karyawan
   resetLemburPageAndRender() { AppState.lemburPagination.page = 1; UI.renderLemburTable(); },
@@ -1578,7 +1619,7 @@ const Handlers = {
       desc.innerHTML = AppState.uploadDataType === 'karyawan'
         ? `Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.<br>
            🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> NIP yang sudah terdaftar akan otomatis dilewati.`
-        : `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (isi: "SPPD 1 2", atau "Lembur").<br>
+        : `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (Bulan: "Januari"–"Desember" ${CONFIG.TAHUN_LEMBUR}; Tagihan: "SPPD 1 2" atau "Lembur").<br>
            ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari Data Karyawan berdasarkan NIP — cukup isi NIP di file Excel.`;
     }
     this.cancelUpload();
@@ -1683,9 +1724,10 @@ const Handlers = {
     const statusBadge = {
       new:             '<span class="pill pill-green">✔ Valid</span>',
       invalid_nip:     '<span class="pill pill-red">✕ NIP Kosong</span>',
-      invalid_nominal: '<span class="pill pill-red">✕ Nominal Tidak Valid</span>'
+      invalid_nominal: '<span class="pill pill-red">✕ Nominal Tidak Valid</span>',
+      invalid_bulan:   '<span class="pill pill-red">✕ Bulan Tidak Dikenali</span>'
     };
-    const rowClass = { new: '', invalid_nip: 'style="opacity:0.4"', invalid_nominal: 'style="opacity:0.4"' };
+    const rowClass = { new: '', invalid_nip: 'style="opacity:0.4"', invalid_nominal: 'style="opacity:0.4"', invalid_bulan: 'style="opacity:0.4"' };
 
     const stats = {
       total: classified.length,
@@ -1700,7 +1742,7 @@ const Handlers = {
           <div class="stat-card"><div class="stat-label">✔ Data Valid (akan ditambahkan)</div><div class="stat-value success">${stats.valid}</div></div>
           <div class="stat-card"><div class="stat-label">✕ Tidak Valid (dilewati)</div><div class="stat-value danger">${stats.invalid}</div></div>
         </div>
-        <div class="info-note">ℹ️ Nama, SBU, dan Jabatan akan otomatis diambil dari Data Karyawan berdasarkan NIP.</div>`;
+        <div class="info-note">ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari NIP. Kolom <strong>Bulan</strong> wajib salah satu dari 12 bulan ${CONFIG.TAHUN_LEMBUR} (mis. "Januari", "Januari 2026") agar bisa masuk breakdown bulanan.</div>`;
     }
 
     document.getElementById('previewHead').innerHTML = '<th>Status</th>' + COLS.map(c => `<th>${c}</th>`).join('');
@@ -1731,8 +1773,7 @@ const Handlers = {
       Utils.toast(stats.invalid > 0
         ? `✅ ${stats.added} data lembur/SPPD ditambahkan. ⚠ ${stats.invalid} baris dilewati (tidak valid).`
         : `✅ ${stats.added} data lembur/SPPD berhasil disimpan.`, 5000);
-      this.resetLemburPageAndRender();
-      this.navigate('dashboard-nonpo');
+      if (stats.bulanTarget) this.navigateBulan(stats.bulanTarget); // ✅ BARU: langsung ke bulan yang baru diupload
       return;
     }
 
@@ -2201,10 +2242,12 @@ const Handlers = {
     btn.style.cursor = ok ? 'pointer' : 'not-allowed';
   },
 
-  // ✅ BARU: Hapus semua data Lembur & SPPD (validasi sama seperti Hapus Semua Karyawan — wajib ketik "HAPUS SEMUA")
+  // ✅ DIUBAH: Hapus semua data Lembur & SPPD — dibatasi hanya bulan yang sedang aktif dipilih
   openModalHapusSemuaLembur() {
-    if (!AppState.lembur.length) return Utils.toast('ℹ️ Tidak ada data lembur/SPPD untuk dihapus.');
-    document.getElementById('deleteAllLemburCount').textContent = AppState.lembur.length + ' data';
+    const bulan = AppState.selectedBulan;
+    const jumlah = AppState.lembur.filter(l => l.Bulan === bulan).length;
+    if (!jumlah) return Utils.toast(`ℹ️ Tidak ada data lembur/SPPD bulan ${bulan} untuk dihapus.`);
+    document.getElementById('deleteAllLemburCount').textContent = `${jumlah} data (${bulan})`;
     document.getElementById('inputKonfirmasiHapusSemuaLembur').value = '';
     const btn = document.getElementById('btnConfirmDeleteAllLembur');
     btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
@@ -2215,16 +2258,17 @@ const Handlers = {
     const input = document.getElementById('inputKonfirmasiHapusSemuaLembur').value;
     if (input !== 'HAPUS SEMUA') return;
 
-    const jumlah = AppState.lembur.length;
-    AppState.log.push(Models.LogChange('SYSTEM', 'SYSTEM', 'lembur hapus semua', `${jumlah} data`, '(semua dihapus)'));
-    AppState.lembur = [];
+    const bulan = AppState.selectedBulan;
+    const jumlah = AppState.lembur.filter(l => l.Bulan === bulan).length;
+    AppState.log.push(Models.LogChange('SYSTEM', 'SYSTEM', 'lembur hapus semua', `${jumlah} data (${bulan})`, '(semua dihapus)'));
+    AppState.lembur = AppState.lembur.filter(l => l.Bulan !== bulan); // ✅ DIUBAH: hanya hapus bulan yang dipilih
     AppState.lemburPagination.page = 1;
     DB.save();
 
     UI.closeModal('modalConfirmDeleteAllLembur');
     UI.renderLemburTable();
     UI.renderDashboardNonPO();
-    Utils.toast(`🗑 Semua data lembur/SPPD (${jumlah}) berhasil dihapus`);
+    Utils.toast(`🗑 Semua data lembur/SPPD bulan ${bulan} (${jumlah}) berhasil dihapus`);
   },
 
   // ✅ BARU: Buka modal Tambah/Edit Manual Data Lembur & SPPD (id null = tambah baru)
@@ -2244,7 +2288,7 @@ const Handlers = {
     } else {
       document.getElementById('lemburNIP').value = '';
       document.getElementById('lemburNominal').value = '';
-      document.getElementById('lemburBulan').value = '';
+      document.getElementById('lemburBulan').value = AppState.selectedBulan || CONFIG.BULAN_OPTIONS[0]; // ✅ DIUBAH: default ke bulan yg sedang dibuka
       document.getElementById('lemburTagihan').value = 'SPPD 1 2';
     }
     this.lookupLemburNIP();
@@ -2353,9 +2397,12 @@ const Handlers = {
   },
 
   // ✅ BARU: Export Excel — Tabel Data Lembur dan SPPD Karyawan (poin baru)
+  // ✅ DIUBAH: Export Excel — Tabel Data Lembur & SPPD, dibatasi bulan yang sedang dipilih
   exportLemburExcel() {
-    if (!AppState.lembur.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
-    const rows = AppState.lembur.map(l => ({
+    const bulan = AppState.selectedBulan;
+    const data = AppState.lembur.filter(l => l.Bulan === bulan);
+    if (!data.length) return Utils.toast('❌ Tidak ada data untuk diexport pada bulan ini!');
+    const rows = data.map(l => ({
       'NIP': l.NIP, 'Nama': l.Nama, 'Nominal': l.Nominal, 'SBU': l.SBU,
       'Jabatan': l.Jabatan, 'Bulan': l.Bulan, 'Tagihan': l.Tagihan
     }));
@@ -2370,12 +2417,13 @@ const Handlers = {
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(logRows), 'Log Perubahan Lembur');
     }
-    XLSX.writeFile(wb, `data-lembur-sppd-${Utils.getTodayDate()}.xlsx`);
+    XLSX.writeFile(wb, `data-lembur-sppd-${bulan.replace(/\s+/g, '-')}-${Utils.getTodayDate()}.xlsx`);
     Utils.toast('✅ Excel berhasil diexport!');
   },
 
-  // ✅ BARU: Export Excel — Dashboard Non PO (rincian per SBU + ringkasan)
+  // ✅ DIUBAH: Export Excel — Dashboard Non PO, dibatasi bulan yang sedang dipilih
   exportDashboardNonPOExcel() {
+    const bulan = AppState.selectedBulan;
     const { rows, totalRealisasi, tiketHPI, manFee, grandTotal } = UI.getNonPOData();
     const dataRows = rows.map(r => ({
       'SBU': r.sbu,
@@ -2404,7 +2452,7 @@ const Handlers = {
       { 'Keterangan': 'Grand Total', 'Nilai': grandTotal }
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Ringkasan');
-    XLSX.writeFile(wb, `dashboard-non-po-${Utils.getTodayDate()}.xlsx`);
+    XLSX.writeFile(wb, `dashboard-non-po-${bulan.replace(/\s+/g, '-')}-${Utils.getTodayDate()}.xlsx`);
     Utils.toast('✅ Excel berhasil diexport!');
   },
 
