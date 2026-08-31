@@ -140,8 +140,13 @@ const CONFIG = {
 
   // ✅ BARU: Daftar bulan baku untuk Data Lembur & SPPD Karyawan tahun 2026 (breakdown per bulan di sidebar)
   BULAN_NAMA: ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],
-  TAHUN_LEMBUR: 2026,
-  get BULAN_OPTIONS() { return this.BULAN_NAMA.map(b => `${b} ${this.TAHUN_LEMBUR}`); }
+  TAHUN_LEMBUR_LIST: [2026, 2027], // ✅ DIUBAH: dukung multi-tahun untuk breakdown Data Lembur & SPPD
+  TAHUN_LEMBUR: 2026, // tahun default (dipakai saat teks Bulan tidak menyebutkan tahun)
+  get BULAN_OPTIONS() {
+    const list = [];
+    this.TAHUN_LEMBUR_LIST.forEach(th => this.BULAN_NAMA.forEach(b => list.push(`${b} ${th}`)));
+    return list;
+  }
 
   // ✅ DIHAPUS: SLOT_PER_SBU & TOTAL_SLOT_KARYAWAN statis tidak dipakai lagi.
   // Slot Jabatan per SBU sekarang dibangun otomatis dari data Excel yang
@@ -484,12 +489,19 @@ const Utils = {
     if (!stripped) return null;
     return AppState.karyawan.find(k => k.NIP.replace(/^0+/, '') === stripped) || null;
   },
-  // ✅ BARU: Normalisasi nilai Bulan ke format baku "NamaBulan 2026" (mis. "januari", "Jan 2026", "JANUARI" → "Januari 2026")
+  // ✅ DIUBAH: Normalisasi nilai Bulan ke format baku "NamaBulan Tahun" — mendukung 2026 & 2027.
+  // Mendeteksi tahun dari teks jika ada (mis. "Januari 2027" → tetap 2027); kalau tidak ada tahun
+  // di teks, pakai tahun default (CONFIG.TAHUN_LEMBUR) supaya data lama tanpa tahun tetap kompatibel.
   normalizeBulan(val) {
     const s = String(val || '').trim();
     if (!s) return '';
     const found = CONFIG.BULAN_NAMA.find(b => new RegExp('^' + b, 'i').test(s));
-    return found ? `${found} ${CONFIG.TAHUN_LEMBUR}` : s;
+    if (!found) return s;
+    const yearMatch = s.match(/\b(20\d{2})\b/);
+    const tahun = (yearMatch && CONFIG.TAHUN_LEMBUR_LIST.includes(Number(yearMatch[1])))
+      ? Number(yearMatch[1])
+      : CONFIG.TAHUN_LEMBUR;
+    return `${found} ${tahun}`;
   },
   fillSelect(id, options) {
     const el = document.getElementById(id);
@@ -1560,22 +1572,27 @@ const Handlers = {
   changePageSize() { AppState.pagination.size = parseInt(document.getElementById('pageSize').value); this.resetPageAndRender(); },
   goToPage(p) { AppState.pagination.page = p; UI.renderKaryawanTable(); },
 
-  // ✅ BARU: Buka/tutup grup menu "2026" (Data Lembur & SPPD) di sidebar
-  toggleTahunLembur() {
-    const el = document.getElementById('menuBulanLembur');
-    const arrow = document.getElementById('tahunLemburArrow');
+  // ✅ DIUBAH: Buka/tutup grup menu tahun (2026 / 2027) di sidebar — sekarang menerima parameter tahun
+  toggleTahunLembur(tahun) {
+    const el = document.getElementById('menuBulanLembur' + tahun);
+    const arrow = document.getElementById('tahunLemburArrow' + tahun);
+    if (!el) return;
     const isOpen = el.style.display !== 'none';
     el.style.display = isOpen ? 'none' : '';
     if (arrow) arrow.textContent = isOpen ? '▸' : '▾';
   },
 
-  // ✅ BARU: Navigasi ke halaman Data Lembur & SPPD untuk 1 bulan tertentu (dipilih dari sidebar "2026")
+  // ✅ BARU: Navigasi ke halaman Data Lembur & SPPD untuk 1 bulan tertentu (dipilih dari sidebar tahun 2026/2027)
   navigateBulan(bulan) {
-    // Pastikan grup "2026" terbuka supaya bulan yang aktif kelihatan
-    const elMonths = document.getElementById('menuBulanLembur');
-    const arrow = document.getElementById('tahunLemburArrow');
-    if (elMonths) elMonths.style.display = '';
-    if (arrow) arrow.textContent = '▾';
+    // Pastikan grup tahun yang sesuai terbuka supaya bulan yang aktif kelihatan
+    const tahunMatch = String(bulan).match(/\b(20\d{2})\b/);
+    if (tahunMatch) {
+      const tahun = tahunMatch[1];
+      const elMonths = document.getElementById('menuBulanLembur' + tahun);
+      const arrow = document.getElementById('tahunLemburArrow' + tahun);
+      if (elMonths) elMonths.style.display = '';
+      if (arrow) arrow.textContent = '▾';
+    }
 
     AppState.selectedBulan = bulan;
     AppState.lemburPagination.page = 1;
@@ -1619,7 +1636,7 @@ const Handlers = {
       desc.innerHTML = AppState.uploadDataType === 'karyawan'
         ? `Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.<br>
            🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> NIP yang sudah terdaftar akan otomatis dilewati.`
-        : `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (Bulan: "Januari"–"Desember" ${CONFIG.TAHUN_LEMBUR}; Tagihan: "SPPD 1 2" atau "Lembur").<br>
+        : `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (Bulan: "Januari"–"Desember" ${CONFIG.TAHUN_LEMBUR_LIST.join('/')}; Tagihan: "SPPD 1 2" atau "Lembur").<br>
            ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari Data Karyawan berdasarkan NIP — cukup isi NIP di file Excel.`;
     }
     this.cancelUpload();
@@ -1742,7 +1759,7 @@ const Handlers = {
           <div class="stat-card"><div class="stat-label">✔ Data Valid (akan ditambahkan)</div><div class="stat-value success">${stats.valid}</div></div>
           <div class="stat-card"><div class="stat-label">✕ Tidak Valid (dilewati)</div><div class="stat-value danger">${stats.invalid}</div></div>
         </div>
-        <div class="info-note">ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari NIP. Kolom <strong>Bulan</strong> wajib salah satu dari 12 bulan ${CONFIG.TAHUN_LEMBUR} (mis. "Januari", "Januari 2026") agar bisa masuk breakdown bulanan.</div>`;
+        <div class="info-note">ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari NIP. Kolom <strong>Bulan</strong> wajib salah satu dari 12 bulan tahun ${CONFIG.TAHUN_LEMBUR_LIST.join(' / ')} (mis. "Januari", "Januari 2027") agar bisa masuk breakdown bulanan.</div>`;
     }
 
     document.getElementById('previewHead').innerHTML = '<th>Status</th>' + COLS.map(c => `<th>${c}</th>`).join('');

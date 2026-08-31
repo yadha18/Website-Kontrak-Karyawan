@@ -40,11 +40,11 @@
     <button class="nav-item" onclick="navigate('karyawan')"><span class="icon">👥</span> Tabel Data Karyawan</button>
 
     <div class="nav-label">Data Lembur dan SPPD Karyawan</div>
-    <button class="nav-item" onclick="Handlers.toggleTahunLembur()" style="justify-content:space-between;">
+    <button class="nav-item" onclick="Handlers.toggleTahunLembur(2026)" style="justify-content:space-between;">
       <span><span class="icon">📅</span> 2026</span>
-      <span id="tahunLemburArrow" style="font-size:11px;">▸</span>
+      <span id="tahunLemburArrow2026" style="font-size:11px;">▸</span>
     </button>
-    <div id="menuBulanLembur" style="display:none;">
+    <div id="menuBulanLembur2026" style="display:none;">
       <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Januari 2026')">Januari</button>
       <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Februari 2026')">Februari</button>
       <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Maret 2026')">Maret</button>
@@ -57,6 +57,26 @@
       <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Oktober 2026')">Oktober</button>
       <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('November 2026')">November</button>
       <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Desember 2026')">Desember</button>
+    </div>
+
+    <!-- ✅ BARU: Grup tahun 2027 -->
+    <button class="nav-item" onclick="Handlers.toggleTahunLembur(2027)" style="justify-content:space-between;">
+      <span><span class="icon">📅</span> 2027</span>
+      <span id="tahunLemburArrow2027" style="font-size:11px;">▸</span>
+    </button>
+    <div id="menuBulanLembur2027" style="display:none;">
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Januari 2027')">Januari</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Februari 2027')">Februari</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Maret 2027')">Maret</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('April 2027')">April</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Mei 2027')">Mei</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Juni 2027')">Juni</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Juli 2027')">Juli</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Agustus 2027')">Agustus</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('September 2027')">September</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Oktober 2027')">Oktober</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('November 2027')">November</button>
+      <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Desember 2027')">Desember</button>
     </div>
 
     <!-- <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button> -->
@@ -293,7 +313,7 @@
     <div class="page" id="page-lembur-bulan">
       <div class="page-header">
         <h1 id="lemburBulanTitle">📅 Data Lembur & SPPD</h1>
-        <p>Breakdown per bulan — pilih bulan lain lewat menu "2026" di samping.</p>
+        <p>Breakdown per bulan — pilih bulan lain lewat menu di samping.</p>
       </div>
 
       <div style="display:flex;gap:10px;margin-bottom:16px;">
@@ -814,6 +834,18 @@
           <option value="Oktober 2026">Oktober 2026</option>
           <option value="November 2026">November 2026</option>
           <option value="Desember 2026">Desember 2026</option>
+          <option value="Januari 2027">Januari 2027</option>
+          <option value="Februari 2027">Februari 2027</option>
+          <option value="Maret 2027">Maret 2027</option>
+          <option value="April 2027">April 2027</option>
+          <option value="Mei 2027">Mei 2027</option>
+          <option value="Juni 2027">Juni 2027</option>
+          <option value="Juli 2027">Juli 2027</option>
+          <option value="Agustus 2027">Agustus 2027</option>
+          <option value="September 2027">September 2027</option>
+          <option value="Oktober 2027">Oktober 2027</option>
+          <option value="November 2027">November 2027</option>
+          <option value="Desember 2027">Desember 2027</option>
         </select>
       </div>
     </div>
