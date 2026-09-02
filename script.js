@@ -1368,7 +1368,6 @@ const UI = {
     const sbuList = CONFIG.DEFAULT_SBU; // 10 SBU + 1 Pusat
     if (!AppState.lemburSbuConfig) AppState.lemburSbuConfig = {};
 
-    let totalRealisasi = 0;
     const rows = sbuList.map(sbu => {
       const cfg = AppState.lemburSbuConfig[sbu] || { paguNonPO: 0, bnlp: 0 };
       const paguPerUnit = (Number(cfg.paguNonPO) || 0) / 12;         // poin 3.ii
@@ -1387,13 +1386,19 @@ const UI = {
       const realisasiSPPD = entriesSPPD.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
       const realisasiLembur = entriesLembur.reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
       const realisasi = realisasiSPPD + realisasiLembur; // poin 3.vii — total gabungan SPPD + Lembur (sesuai spesifikasi)
-      totalRealisasi += realisasi;
 
       const realisasiMaxTopupPct = maxTopupPerBulan !== 0 ? (realisasi / maxTopupPerBulan) * 100 : 0; // poin 3.viii
       const persentase = paguPerBulanStatic !== 0 ? (realisasi / paguPerBulanStatic) * 100 : 0;        // poin 3.x
 
       return { sbu, cfg, paguPerUnit, bnlpPerBulan, maxTopupPerBulan, jumlahKaryawan, jumlahKaryawanSPPD, jumlahKaryawanLembur, realisasiSPPD, realisasiLembur, realisasi, realisasiMaxTopupPct, paguPerBulanStatic, persentase };
     });
+
+    // ✅ DIUBAH: Total Realisasi dihitung dari SEMUA data bulan ini (bukan hanya baris SBU yang cocok).
+    // Ini memastikan data karyawan yang resign/dihapus dari Data Karyawan tetap terhitung penuh
+    // dan tidak pernah mengurangi Total Realisasi / Grand Total, walau SBU-nya sudah tidak match.
+    const totalRealisasi = AppState.lembur
+      .filter(l => l.Bulan === AppState.selectedBulan)
+      .reduce((sum, l) => sum + (Number(l.Nominal) || 0), 0);
 
     const tiketHPI = Number(AppState.tiketHPI) || 0;
     const manFee = totalRealisasi * CONFIG.MAN_FEE_PERSEN;
@@ -2312,14 +2317,36 @@ const Handlers = {
     document.getElementById('modalEditLembur').classList.add('open');
   },
 
-  // ✅ BARU: Auto-lookup Nama/SBU/Jabatan dari Data Karyawan berdasarkan NIP yang diketik
+  // ✅ DIUBAH: Auto-lookup Nama/SBU/Jabatan dari Data Karyawan berdasarkan NIP yang diketik.
+  // Kalau karyawan tidak ditemukan (resign/dihapus) TAPI data lembur ini sudah punya Nama/SBU/Jabatan
+  // tersimpan sebelumnya, tampilkan data arsip itu — bukan dikosongkan — supaya jelas datanya tetap ada.
   lookupLemburNIP() {
     const nip = document.getElementById('lemburNIP').value.trim();
     const emp = Utils.findKaryawanByNIP(nip);
-    document.getElementById('lemburNamaPreview').value = emp ? emp.Nama : '';
-    document.getElementById('lemburSBUPreview').value = emp ? emp.SBU : '';
-    document.getElementById('lemburJabatanPreview').value = emp ? emp.Jabatan : '';
-    document.getElementById('lemburNIPWarning').style.display = (nip && !emp) ? 'block' : 'none';
+    const editId = AppState.modals.lemburEditId;
+    const existing = (editId !== null && editId !== undefined) ? AppState.lembur.find(l => l.id === editId) : null;
+    const fallback = (existing && existing.NIP === nip) ? existing : null;
+
+    document.getElementById('lemburNamaPreview').value = emp ? emp.Nama : (fallback ? fallback.Nama : '');
+    document.getElementById('lemburSBUPreview').value = emp ? emp.SBU : (fallback ? fallback.SBU : '');
+    document.getElementById('lemburJabatanPreview').value = emp ? emp.Jabatan : (fallback ? fallback.Jabatan : '');
+
+    const warning = document.getElementById('lemburNIPWarning');
+    if (!nip || emp) {
+      warning.style.display = 'none';
+    } else if (fallback) {
+      warning.style.display = 'block';
+      warning.style.color = 'var(--warning)';
+      warning.style.background = 'rgba(234,179,8,.08)';
+      warning.style.borderColor = 'rgba(234,179,8,.25)';
+      warning.textContent = '📌 Karyawan ini sudah tidak ada di Data Karyawan (resign/dihapus). Nama/SBU/Jabatan yang ditampilkan adalah data arsip — tetap tersimpan & tetap dihitung di Realisasi.';
+    } else {
+      warning.style.display = 'block';
+      warning.style.color = 'var(--danger)';
+      warning.style.background = 'rgba(239,68,68,.08)';
+      warning.style.borderColor = 'rgba(239,68,68,.2)';
+      warning.textContent = '⚠️ NIP tidak ditemukan di Data Karyawan. Nama/SBU/Jabatan akan dikosongkan.';
+    }
   },
 
   // ✅ BARU: Simpan data Lembur/SPPD manual (tambah baru atau edit), dicatat ke log "lembur"
@@ -2334,13 +2361,18 @@ const Handlers = {
     if (!bulan) return Utils.toast('❌ Bulan wajib diisi!');
 
     const emp = Utils.findKaryawanByNIP(nip);
-    const enriched = { NIP: nip, Nominal: nominal, Bulan: bulan, Tagihan: tagihan,
-      Nama: emp ? emp.Nama : '', SBU: emp ? emp.SBU : '', Jabatan: emp ? emp.Jabatan : '' };
-
     const editId = AppState.modals.lemburEditId;
-    if (editId !== null && editId !== undefined) {
+    const existing = (editId !== null && editId !== undefined) ? AppState.lembur.find(l => l.id === editId) : null;
+    // ✅ DIUBAH: kalau karyawan sudah resign/dihapus dari Data Karyawan (emp tidak ditemukan) saat mengedit
+    // data lama, JANGAN kosongkan Nama/SBU/Jabatan yang sudah tersimpan — pertahankan datanya supaya
+    // tidak hilang dari perhitungan Realisasi SPPD/Lembur per SBU.
+    const enriched = { NIP: nip, Nominal: nominal, Bulan: bulan, Tagihan: tagihan,
+      Nama:    emp ? emp.Nama    : (existing ? existing.Nama    : ''),
+      SBU:     emp ? emp.SBU     : (existing ? existing.SBU     : ''),
+      Jabatan: emp ? emp.Jabatan : (existing ? existing.Jabatan : '') };
+
+    if (existing) {
       const idx = AppState.lembur.findIndex(l => l.id === editId);
-      if (idx === -1) return;
       AppState.lembur[idx] = Models.Lembur({ ...enriched, id: editId });
       AppState.log.push(Models.LogChange(nip, enriched.Nama || nip, 'lembur edit',
         '-', `${tagihan} · ${bulan} · ${Utils.formatRupiah(nominal)}`, 'Data diedit manual'));
