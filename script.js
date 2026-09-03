@@ -146,7 +146,10 @@ const CONFIG = {
     const list = [];
     this.TAHUN_LEMBUR_LIST.forEach(th => this.BULAN_NAMA.forEach(b => list.push(`${b} ${th}`)));
     return list;
-  }
+  },
+
+  // ✅ BARU: Konfigurasi Monitoring Pengadaan Laptop
+  STATUS_LAPTOP_OPTIONS: ['Aktif', 'Belum Dikembalikan', 'Sudah Dikembalikan']
 
   // ✅ DIHAPUS: SLOT_PER_SBU & TOTAL_SLOT_KARYAWAN statis tidak dipakai lagi.
   // Slot Jabatan per SBU sekarang dibangun otomatis dari data Excel yang
@@ -180,7 +183,12 @@ const AppState = {
   lemburPagination: { page: 1, size: 10 }, // ✅ BARU: pagination untuk Tabel Data Lembur dan SPPD Karyawan
   selectedBulan: null,      // ✅ BARU: bulan yang sedang aktif dipilih dari sidebar (wajib pilih 1 bulan)
   lemburViewTab: 'dashboard', // ✅ BARU: 'dashboard' | 'tabel' — tab aktif di halaman bulan Lembur & SPPD
-  modals: { editTargetId: null, statusTargetId: null, statusListTarget: null, lemburEditId: null },
+
+  // ✅ BARU: Monitoring Pengadaan Laptop
+  laptop: [],
+  laptopPagination: { page: 1, size: 10 },
+
+  modals: { editTargetId: null, statusTargetId: null, statusListTarget: null, lemburEditId: null, laptopEditId: null, laptopDetailNIP: null, pendingBuktiBA: null, pendingBuktiBAFileName: null },
   slotPanelOpen: {}, // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
   slotJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan, key = "SBU::Jabatan"
 
@@ -240,6 +248,22 @@ const Models = {
       Jabatan: Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       Bulan:   Utils.normalizeBulan(data.Bulan),
       Tagihan: Utils.normalizeTagihan(data.Tagihan) // "SPPD 1 2" | "Lembur"
+    };
+  },
+
+  // ✅ BARU: Model data satu baris Monitoring Pengadaan Laptop
+  Laptop(data = {}) {
+    return {
+      id:              data.id || Utils.generateId(),
+      NIP:             String(data.NIP || '').trim(),
+      NamaPerangkat:   String(data.NamaPerangkat || '').trim(),
+      PA:              String(data.PA || '').trim(),
+      NamaPengguna:    String(data.NamaPengguna || '').trim(),
+      SerialNumber:    String(data.SerialNumber || '').trim(),
+      SBU:             Utils.resolveSBU(String(data.SBU || '').trim()),
+      Status:          CONFIG.STATUS_LAPTOP_OPTIONS.includes(data.Status) ? data.Status : '',
+      BuktiBA:         data.BuktiBA || null,          // base64 data URL gambar berita acara (dikompres)
+      BuktiBAFileName: data.BuktiBAFileName || null
     };
   }
 };
@@ -489,6 +513,40 @@ const Utils = {
     if (!stripped) return null;
     return AppState.karyawan.find(k => k.NIP.replace(/^0+/, '') === stripped) || null;
   },
+
+  // ✅ BARU: Kompres & resize gambar (Bukti Berita Acara) sebelum disimpan sebagai base64 —
+  // supaya ukuran data tetap kecil (data disimpan langsung di database bersama data lain).
+  compressImageFile(file, maxWidth = 900, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Gagal membaca file'));
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('File bukan gambar yang valid'));
+        img.onload = () => {
+          const scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+
+  // ✅ BARU: Saran Status Laptop berdasarkan aturan — resign + belum ada bukti = Belum Dikembalikan,
+  // resign + sudah ada bukti = Sudah Dikembalikan, masih aktif bekerja = Aktif. Hanya SARAN (poin 3),
+  // Status tetap bisa dipilih manual.
+  suggestStatusLaptop(nip, hasBukti) {
+    const emp = Utils.findKaryawanByNIP(nip);
+    const isResign = emp && emp.Status === 'Resign';
+    if (isResign) return hasBukti ? 'Sudah Dikembalikan' : 'Belum Dikembalikan';
+    return 'Aktif';
+  },
   // ✅ DIUBAH: Normalisasi nilai Bulan ke format baku "NamaBulan Tahun" — mendukung 2026 & 2027.
   // Mendeteksi tahun dari teks jika ada (mis. "Januari 2027" → tetap 2027); kalau tidak ada tahun
   // di teks, pakai tahun default (CONFIG.TAHUN_LEMBUR) supaya data lama tanpa tahun tetap kompatibel.
@@ -558,6 +616,16 @@ const DB = {
       AppState.lemburSbuConfig = data.lemburSbuConfig && typeof data.lemburSbuConfig === 'object' ? data.lemburSbuConfig : {};
       AppState.tiketHPI = Number(data.tiketHPI) || 0;
 
+      // ✅ BARU: Monitoring Pengadaan Laptop
+      AppState.laptop = (Array.isArray(data.laptop) ? data.laptop : []).map(l => Models.Laptop(l));
+      // Re-sync Nama Pengguna/Regional yang kosong — untuk data lama yang gagal ke-lookup saat upload
+      AppState.laptop.forEach(l => {
+        if (!l.SBU || !l.NamaPengguna) {
+          const emp = Utils.findKaryawanByNIP(l.NIP);
+          if (emp) { l.NamaPengguna = emp.Nama; l.SBU = emp.SBU; }
+        }
+      });
+
       return true;
     } catch (err) {
       console.error('Gagal memuat data dari server:', err);
@@ -570,6 +638,7 @@ const DB = {
       AppState.lembur = AppState.lembur || [];
       AppState.lemburSbuConfig = AppState.lemburSbuConfig || {};
       AppState.tiketHPI = Number(AppState.tiketHPI) || 0;
+      AppState.laptop = AppState.laptop || [];
       return false;
     }
   },
@@ -592,7 +661,8 @@ const DB = {
           slotConfig: AppState.slotConfig,
           lembur: AppState.lembur,
           lemburSbuConfig: AppState.lemburSbuConfig,
-          tiketHPI: AppState.tiketHPI
+          tiketHPI: AppState.tiketHPI,
+          laptop: AppState.laptop
         })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -922,6 +992,68 @@ const LemburService = {
     DB.save();
   }
 };
+
+// ✅ BARU: Layanan untuk Monitoring Pengadaan Laptop
+const LaptopService = {
+  // Ambil Nama Pengguna & Regional (SBU) dari Data Karyawan berdasarkan NIP.
+  // Kalau NIP tidak ditemukan (mis. karyawan sudah dihapus), pakai kolom Nama Pengguna/Regional
+  // dari Excel sebagai fallback — supaya riwayat karyawan resign yang sudah dihapus tetap tercatat.
+  enrichFromKaryawan(row) {
+    const emp = Utils.findKaryawanByNIP(row.NIP);
+    return {
+      NIP: row.NIP,
+      NamaPengguna: emp ? emp.Nama : (row.NamaPengguna || ''),
+      SBU: emp ? emp.SBU : (row.SBU || ''),
+      NamaPerangkat: row.NamaPerangkat,
+      PA: row.PA,
+      SerialNumber: row.SerialNumber,
+      Status: row.Status
+    };
+  },
+
+  classifyUploadRows(rows) {
+    return rows.map(raw => {
+      const nip = String(raw.NIP || '').trim();
+      const namaPerangkat = String(raw.NamaPerangkat || '').trim();
+      const serial = String(raw.SerialNumber || '').trim();
+      let status;
+      if (!nip) status = 'invalid_nip';
+      else if (!namaPerangkat) status = 'invalid_perangkat';
+      else if (!serial) status = 'invalid_serial';
+      else status = 'new';
+      return { ...raw, __uploadStatus: status };
+    });
+  },
+
+  bulkUpload(dataArray) {
+    const classified = this.classifyUploadRows(dataArray);
+    const toInsert = classified.filter(r => r.__uploadStatus === 'new');
+    const newRows = toInsert.map(r => Models.Laptop(this.enrichFromKaryawan(r)));
+    AppState.laptop = AppState.laptop.concat(newRows);
+
+    const stats = {
+      total: classified.length,
+      added: toInsert.length,
+      invalid: classified.filter(r => r.__uploadStatus !== 'new').length
+    };
+
+    if (stats.total > 0) {
+      AppState.log.push(Models.LogChange(
+        'SYSTEM', 'SYSTEM', 'laptop upload',
+        `${stats.total} baris diproses`,
+        `${stats.added} baru ditambahkan, ${stats.invalid} dilewati (NIP/Nama Perangkat/Serial Number tidak valid)`
+      ));
+    }
+
+    DB.save();
+    return stats;
+  },
+
+  deleteById(id) {
+    AppState.laptop = AppState.laptop.filter(l => l.id !== id);
+    DB.save();
+  }
+};
 // ─── 7. UI RENDERER ─────────────────────────────────────────────────────────
 const UI = {
   async init() {
@@ -970,7 +1102,7 @@ const UI = {
   renderDashboard() {
     // ✅ DIUBAH: log Data Karyawan kini terpisah dari log Data Lembur & SPPD (type diawali "lembur")
     const { karyawan, jabatan } = AppState;
-    const log = AppState.log.filter(c => !c.type.startsWith('lembur'));
+    const log = AppState.log.filter(c => !c.type.startsWith('lembur') && !c.type.startsWith('laptop')); // ✅ DIUBAH: log Laptop juga dipisah
     // document.getElementById('stat-total').textContent  = karyawan.length;
     document.getElementById('stat-baru').textContent   = karyawan.filter(k => k.Status === 'Baru Masuk').length;
     document.getElementById('stat-aktif').textContent  = karyawan.filter(k => k.Status === 'Aktif').length;
@@ -1501,6 +1633,158 @@ const UI = {
       </div>`;
   },
 
+  // ✅ BARU: Render Dashboard Laptop — ringkasan status per SBU (mirip Dashboard Non PO)
+  renderDashboardLaptop() {
+    const sbuList = CONFIG.DEFAULT_SBU;
+    const laptop = AppState.laptop;
+
+    const rows = sbuList.map(sbu => {
+      const entries = laptop.filter(l => l.SBU === sbu);
+      const aktif = entries.filter(l => l.Status === 'Aktif').length;
+      const belum = entries.filter(l => l.Status === 'Belum Dikembalikan').length;
+      const sudah = entries.filter(l => l.Status === 'Sudah Dikembalikan').length;
+      const kosong = entries.filter(l => !l.Status).length;
+      return { sbu, total: entries.length, aktif, belum, sudah, kosong };
+    });
+
+    const totalAktif = laptop.filter(l => l.Status === 'Aktif').length;
+    const totalBelum = laptop.filter(l => l.Status === 'Belum Dikembalikan').length;
+    const totalSudah = laptop.filter(l => l.Status === 'Sudah Dikembalikan').length;
+
+    const elCard = document.getElementById('laptop-summary-card');
+    if (elCard) {
+      elCard.innerHTML = `
+        <div class="flex-between" style="align-items:center;margin-bottom:14px;">
+          <div class="card-title" style="margin:0;">💻 Ringkasan Status Laptop</div>
+          <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardLaptopExcel()">⬇ Export Excel</button>
+        </div>
+        <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="stat-card"><div class="stat-label">Total Laptop</div><div class="stat-value accent">${laptop.length}</div></div>
+          <div class="stat-card"><div class="stat-label">🟢 Aktif</div><div class="stat-value success">${totalAktif}</div></div>
+          <div class="stat-card"><div class="stat-label">🔴 Belum Dikembalikan</div><div class="stat-value danger">${totalBelum}</div></div>
+          <div class="stat-card"><div class="stat-label">✅ Sudah Dikembalikan</div><div class="stat-value warning">${totalSudah}</div></div>
+        </div>`;
+    }
+
+    const elTable = document.getElementById('laptop-nonpo-table');
+    if (elTable) {
+      elTable.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>SBU</th><th>Total Laptop</th><th>🟢 Aktif</th><th>🔴 Belum Dikembalikan</th><th>✅ Sudah Dikembalikan</th><th>Belum Diisi Status</th></tr></thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td style="font-weight:500;">${r.sbu}</td>
+                  <td class="mono" style="text-align:center;font-weight:600;">${r.total}</td>
+                  <td class="mono" style="text-align:center;">${r.aktif}</td>
+                  <td class="mono" style="text-align:center;">${r.belum}</td>
+                  <td class="mono" style="text-align:center;">${r.sudah}</td>
+                  <td class="mono" style="text-align:center;color:var(--text2);">${r.kosong}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    this.renderLaptopLog();
+  },
+
+  // ✅ BARU: Log Perubahan khusus Monitoring Laptop (terpisah dari log Karyawan & Lembur)
+  renderLaptopLog() {
+    const container = document.getElementById('laptop-log-table');
+    if (!container) return;
+    const laptopLog = AppState.log.filter(c => c.type.startsWith('laptop')).slice().reverse();
+
+    if (!laptopLog.length) {
+      container.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Belum ada perubahan</h3><p>Log akan muncul saat ada upload, tambah, edit, atau hapus data laptop.</p></div>`;
+      return;
+    }
+
+    const pillColor = { 'laptop upload': 'green', 'laptop tambah': 'green', 'laptop edit': 'blue', 'laptop hapus': 'yellow', 'laptop hapus semua': 'red' };
+    container.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tanggal</th><th>NIP</th><th>Nama</th><th>Tipe</th><th>Detail Perubahan</th></tr></thead>
+          <tbody>
+            ${laptopLog.map(c => `
+              <tr>
+                <td style="font-size:11px;color:var(--text2)">${c.ts}</td>
+                <td class="mono">${c.nik}</td><td style="font-weight:500">${c.nama}</td>
+                <td><span class="pill pill-${pillColor[c.type] || 'gray'}">${c.type.replace('laptop ', '').toUpperCase()}</span></td>
+                <td style="font-size:12px"><span class="diff-old">${c.oldVal}</span><br><span class="diff-new">${c.newVal}</span>${c.catatan ? `<br><span style="color:var(--text2);font-size:10px">${c.catatan}</span>` : ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  },
+
+  // ✅ BARU: Render Tabel Monitoring Pengadaan Laptop
+  renderLaptopTable() {
+    const { laptop, laptopPagination } = AppState;
+    const q    = (document.getElementById('searchLaptop')?.value || '').toLowerCase();
+    const fSBU = document.getElementById('filterLaptopSBU')?.value || '';
+    const fSt  = document.getElementById('filterLaptopStatus')?.value || '';
+
+    Utils.fillSelect('filterLaptopSBU', CONFIG.DEFAULT_SBU);
+    Utils.fillSelect('filterLaptopStatus', CONFIG.STATUS_LAPTOP_OPTIONS);
+
+    const filtered = laptop.filter(l =>
+      (!q || l.NIP.toLowerCase().includes(q) || l.NamaPengguna.toLowerCase().includes(q) || l.SerialNumber.toLowerCase().includes(q) || l.NamaPerangkat.toLowerCase().includes(q)) &&
+      (!fSBU || l.SBU === fSBU) &&
+      (!fSt || l.Status === fSt)
+    );
+
+    const tbody = document.getElementById('laptopBody');
+    const pageContainer = document.getElementById('paginationLaptop');
+    if (!tbody) return;
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">💻</div><h3>Tidak ada data</h3></div></td></tr>`;
+      if (pageContainer) pageContainer.style.display = 'none';
+      return;
+    }
+
+    if (pageContainer) pageContainer.style.display = 'flex';
+    const elTotal = document.getElementById('totalLaptopData');
+    if (elTotal) elTotal.textContent = filtered.length;
+    const totalPages = Math.ceil(filtered.length / laptopPagination.size) || 1;
+    if (laptopPagination.page > totalPages) laptopPagination.page = totalPages;
+    const startIdx = (laptopPagination.page - 1) * laptopPagination.size;
+    const paginated = filtered.slice(startIdx, startIdx + laptopPagination.size);
+
+    const statusPill = { 'Aktif': 'pill-green', 'Belum Dikembalikan': 'pill-red', 'Sudah Dikembalikan': 'pill-blue' };
+
+    tbody.innerHTML = paginated.map((l, i) => {
+      const suggestion = Utils.suggestStatusLaptop(l.NIP, !!l.BuktiBA);
+      const mismatch = l.Status && suggestion !== l.Status;
+      return `
+      <tr>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick="Handlers.openLaptopModal(${l.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="Handlers.deleteLaptop(${l.id})">🗑</button>
+        </td>
+        <td class="mono" style="text-align:center;">${startIdx + i + 1}</td>
+        <td>${l.NamaPerangkat || '—'}</td>
+        <td>${l.PA || '—'}</td>
+        <td style="font-weight:500;color:var(--accent2);cursor:pointer;" onclick="Handlers.openLaptopDetailModal('${l.NIP}')" title="Lihat detail peminjaman">${l.NamaPengguna || '—'}</td>
+        <td class="mono">${l.SerialNumber || '—'}</td>
+        <td>${l.SBU || '—'}</td>
+        <td>
+          <span class="pill ${statusPill[l.Status] || 'pill-gray'}">${l.Status || 'Belum diisi'}</span>
+          ${mismatch ? `<div style="font-size:10px;color:var(--warning);margin-top:2px;">⚠️ Saran: ${suggestion}</div>` : ''}
+        </td>
+        <td style="text-align:center;">
+          ${l.BuktiBA
+            ? `<img src="${l.BuktiBA}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;cursor:pointer;" onclick="Handlers.viewBuktiBA('${l.id}')" title="Lihat gambar">`
+            : `<span style="font-size:11px;color:var(--text2)">—</span>`}
+        </td>
+      </tr>`;
+    }).join('');
+
+    this.renderPaginationGeneric('laptopPageControls', laptopPagination.page, totalPages, 'Handlers.goToLaptopPage');
+  },
+
   renderPindahJabatan() {
     const q  = (document.getElementById('searchPindah')?.value || '').toLowerCase();
     const fK = document.getElementById('filterPindahJabatan')?.value || '';
@@ -1568,7 +1852,8 @@ const Handlers = {
     // dipanggil lewat Handlers.navigateBulan() dari menu sidebar — tidak lagi lewat navigate() biasa.
     const renders = {
       dashboard: 'renderDashboard', karyawan: 'renderKaryawanTable',
-      pindah: 'renderPindahJabatan', jabatan: 'renderJabatanList'
+      pindah: 'renderPindahJabatan', jabatan: 'renderJabatanList',
+      'dashboard-laptop': 'renderDashboardLaptop', laptop: 'renderLaptopTable' // ✅ BARU
     };
     if (renders[page]) UI[renders[page]]();
     if (page === 'upload') this.setUploadType(AppState.uploadDataType || 'karyawan'); // ✅ BARU
@@ -1576,6 +1861,11 @@ const Handlers = {
   resetPageAndRender() { AppState.pagination.page = 1; UI.renderKaryawanTable(); },
   changePageSize() { AppState.pagination.size = parseInt(document.getElementById('pageSize').value); this.resetPageAndRender(); },
   goToPage(p) { AppState.pagination.page = p; UI.renderKaryawanTable(); },
+
+  // ✅ BARU: Pagination untuk Tabel Monitoring Laptop
+  resetLaptopPageAndRender() { AppState.laptopPagination.page = 1; UI.renderLaptopTable(); },
+  changeLaptopPageSize() { AppState.laptopPagination.size = parseInt(document.getElementById('laptopPageSize').value); this.resetLaptopPageAndRender(); },
+  goToLaptopPage(p) { AppState.laptopPagination.page = p; UI.renderLaptopTable(); },
 
   // ✅ DIUBAH: Buka/tutup grup menu tahun (2026 / 2027) di sidebar — sekarang menerima parameter tahun
   toggleTahunLembur(tahun) {
@@ -1628,21 +1918,29 @@ const Handlers = {
   changeLemburPageSize() { AppState.lemburPagination.size = parseInt(document.getElementById('lemburPageSize').value); this.resetLemburPageAndRender(); },
   goToLemburPage(p) { AppState.lemburPagination.page = p; UI.renderLemburTable(); },
 
-  // ✅ BARU: Pilih jenis data yang akan diupload (poin 1) — mengubah kolom yang dibaca dari Excel
+  // ✅ DIUBAH: Pilih jenis data yang akan diupload (poin 1) — mengubah kolom yang dibaca dari Excel. Sekarang 3 pilihan.
   setUploadType(type) {
-    AppState.uploadDataType = type === 'lembur' ? 'lembur' : 'karyawan';
+    AppState.uploadDataType = ['karyawan', 'lembur', 'laptop'].includes(type) ? type : 'karyawan';
     const btnK = document.getElementById('btnUploadTypeKaryawan');
     const btnL = document.getElementById('btnUploadTypeLembur');
+    const btnP = document.getElementById('btnUploadTypeLaptop');
     if (btnK) btnK.className = 'btn ' + (AppState.uploadDataType === 'karyawan' ? 'btn-primary' : 'btn-secondary');
     if (btnL) btnL.className = 'btn ' + (AppState.uploadDataType === 'lembur' ? 'btn-primary' : 'btn-secondary');
+    if (btnP) btnP.className = 'btn ' + (AppState.uploadDataType === 'laptop' ? 'btn-primary' : 'btn-secondary');
 
     const desc = document.getElementById('uploadTypeDesc');
     if (desc) {
-      desc.innerHTML = AppState.uploadDataType === 'karyawan'
-        ? `Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.<br>
-           🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> NIP yang sudah terdaftar akan otomatis dilewati.`
-        : `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (Bulan: "Januari"–"Desember" ${CONFIG.TAHUN_LEMBUR_LIST.join('/')}; Tagihan: "SPPD 1 2" atau "Lembur").<br>
+      if (AppState.uploadDataType === 'karyawan') {
+        desc.innerHTML = `Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.<br>
+           🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> NIP yang sudah terdaftar akan otomatis dilewati.`;
+      } else if (AppState.uploadDataType === 'lembur') {
+        desc.innerHTML = `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (Bulan: "Januari"–"Desember" ${CONFIG.TAHUN_LEMBUR_LIST.join('/')}; Tagihan: "SPPD 1 2" atau "Lembur").<br>
            ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari Data Karyawan berdasarkan NIP — cukup isi NIP di file Excel.`;
+      } else {
+        desc.innerHTML = `Kolom: <strong>NIP, Nama Perangkat, PA, Serial Number, Status</strong> (Status: "Aktif", "Belum Dikembalikan", atau "Sudah Dikembalikan" — boleh dikosongkan).<br>
+           ℹ️ Nama Pengguna &amp; Regional (SBU) otomatis diambil dari Data Karyawan berdasarkan NIP. Kolom opsional <strong>Nama Pengguna</strong> &amp; <strong>Regional</strong> dipakai sebagai cadangan kalau NIP tidak ditemukan (mis. karyawan sudah dihapus).<br>
+           📎 <strong>Bukti Berita Acara Pengembalian</strong> (gambar) tidak bisa diupload lewat Excel — upload manual per laptop lewat tombol ✏️ Edit setelah data masuk.`;
+      }
     }
     this.cancelUpload();
   },
@@ -1670,6 +1968,7 @@ const Handlers = {
 
       // ✅ BARU: cabang berdasarkan jenis data yang dipilih di halaman Upload (poin 1)
       if (AppState.uploadDataType === 'lembur') return this.processExcelLembur(raw);
+      if (AppState.uploadDataType === 'laptop') return this.processExcelLaptop(raw);
 
       const COLS = ['NIP','Nama','NIK','Grade','Jabatan','SBU','BKO Jabatan','BKO SBU','NIP Baru',
         'Email','Email Korporat','Nama Akun ICRM','Tanggal Masuk','Tanggal Keluar','Ukuran Baju','Nomor Telpon','Status','Catatan Status'];
@@ -1779,6 +2078,58 @@ const Handlers = {
     Utils.toast(`✅ Berhasil membaca ${AppState.previewUpload.length} baris data`);
   },
 
+  // ✅ BARU: Baca & preview file Excel untuk Monitoring Pengadaan Laptop.
+  // Nama Pengguna & Regional bersifat opsional (cadangan) — akan ditimpa data Karyawan kalau NIP ketemu.
+  processExcelLaptop(raw) {
+    const COLS = ['NIP', 'NamaPerangkat', 'PA', 'SerialNumber', 'Status', 'NamaPengguna', 'SBU'];
+    const COL_LABEL = { NamaPerangkat: 'Nama Perangkat', SerialNumber: 'Serial Number', NamaPengguna: 'Nama Pengguna', SBU: 'Regional' };
+    const header = raw[0].map(h => String(h).trim());
+
+    AppState.previewUpload = raw.slice(1).map(row => {
+      let obj = {};
+      COLS.forEach(col => {
+        const label = COL_LABEL[col] || col;
+        const idx = header.findIndex(h => h.toLowerCase() === label.toLowerCase() || h.toLowerCase() === col.toLowerCase());
+        obj[col] = idx >= 0 ? String(row[idx]) : '';
+      });
+      return obj;
+    }).filter(r => r.NIP || r.NamaPerangkat || r.SerialNumber);
+
+    const classified = LaptopService.classifyUploadRows(AppState.previewUpload);
+    const statusBadge = {
+      new:               '<span class="pill pill-green">✔ Valid</span>',
+      invalid_nip:       '<span class="pill pill-red">✕ NIP Kosong</span>',
+      invalid_perangkat: '<span class="pill pill-red">✕ Nama Perangkat Kosong</span>',
+      invalid_serial:    '<span class="pill pill-red">✕ Serial Number Kosong</span>'
+    };
+    const rowClass = { new: '', invalid_nip: 'style="opacity:0.4"', invalid_perangkat: 'style="opacity:0.4"', invalid_serial: 'style="opacity:0.4"' };
+
+    const stats = {
+      total: classified.length,
+      valid: classified.filter(r => r.__uploadStatus === 'new').length,
+      invalid: classified.filter(r => r.__uploadStatus !== 'new').length
+    };
+
+    const elStats = document.getElementById('previewStats');
+    if (elStats) {
+      elStats.innerHTML = `
+        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
+          <div class="stat-card"><div class="stat-label">✔ Data Valid (akan ditambahkan)</div><div class="stat-value success">${stats.valid}</div></div>
+          <div class="stat-card"><div class="stat-label">✕ Tidak Valid (dilewati)</div><div class="stat-value danger">${stats.invalid}</div></div>
+        </div>
+        <div class="info-note">ℹ️ Nama Pengguna &amp; Regional otomatis diambil dari NIP kalau ketemu. Bukti Berita Acara diupload manual per laptop setelah data ini masuk.</div>`;
+    }
+
+    const displayCols = ['NIP', 'NamaPerangkat', 'PA', 'SerialNumber', 'Status'];
+    document.getElementById('previewHead').innerHTML = '<th>Status</th>' + displayCols.map(c => `<th>${COL_LABEL[c] || c}</th>`).join('');
+    document.getElementById('previewBody').innerHTML = classified.slice(0, 50).map(r => `
+      <tr ${rowClass[r.__uploadStatus]}><td>${statusBadge[r.__uploadStatus]}</td>${displayCols.map(c => `<td class="${c === 'NIP' ? 'mono' : ''}">${r[c]}</td>`).join('')}</tr>
+    `).join('') + (classified.length > 50 ? `<tr><td colspan="${displayCols.length + 1}" style="text-align:center;color:var(--text2);">... dan ${classified.length - 50} baris lainnya</td></tr>` : '');
+
+    document.getElementById('previewCard').style.display = 'block';
+    Utils.toast(`✅ Berhasil membaca ${AppState.previewUpload.length} baris data`);
+  },
+
   cancelUpload() {
     AppState.previewUpload = [];
     document.getElementById('previewCard').style.display = 'none';
@@ -1796,6 +2147,18 @@ const Handlers = {
         ? `✅ ${stats.added} data lembur/SPPD ditambahkan. ⚠ ${stats.invalid} baris dilewati (tidak valid).`
         : `✅ ${stats.added} data lembur/SPPD berhasil disimpan.`, 5000);
       if (stats.bulanTarget) this.navigateBulan(stats.bulanTarget); // ✅ BARU: langsung ke bulan yang baru diupload
+      return;
+    }
+
+    // ✅ BARU: Cabang upload Monitoring Pengadaan Laptop
+    if (AppState.uploadDataType === 'laptop') {
+      const stats = LaptopService.bulkUpload(AppState.previewUpload);
+      this.cancelUpload();
+      Utils.toast(stats.invalid > 0
+        ? `✅ ${stats.added} data laptop ditambahkan. ⚠ ${stats.invalid} baris dilewati (tidak valid).`
+        : `✅ ${stats.added} data laptop berhasil disimpan.`, 5000);
+      this.resetLaptopPageAndRender();
+      this.navigate('dashboard-laptop');
       return;
     }
 
@@ -2505,6 +2868,263 @@ const Handlers = {
     Utils.toast('✅ Excel berhasil diexport!');
   },
 
+  // ✅ BARU: Buka modal Tambah/Edit Monitoring Laptop (id null = tambah baru)
+  openLaptopModal(id) {
+    AppState.modals.laptopEditId = id;
+    AppState.modals.pendingBuktiBA = null;
+    AppState.modals.pendingBuktiBAFileName = null;
+    const isEdit = id !== null && id !== undefined;
+    document.getElementById('modalLaptopTitle').textContent = isEdit ? '✏️ Edit Data Laptop' : '➕ Tambah Data Laptop';
+    document.getElementById('laptopFileInput').value = '';
+    document.getElementById('laptopBuktiPreviewWrap').style.display = 'none';
+
+    if (isEdit) {
+      const item = AppState.laptop.find(l => l.id === id);
+      if (!item) return;
+      document.getElementById('laptopNIP').value = item.NIP;
+      document.getElementById('laptopNamaPerangkat').value = item.NamaPerangkat;
+      document.getElementById('laptopPA').value = item.PA;
+      document.getElementById('laptopSerialNumber').value = item.SerialNumber;
+      document.getElementById('laptopStatus').value = item.Status || '';
+      if (item.BuktiBA) {
+        document.getElementById('laptopBuktiPreviewWrap').style.display = 'block';
+        document.getElementById('laptopBuktiPreviewImg').src = item.BuktiBA;
+      }
+    } else {
+      document.getElementById('laptopNIP').value = '';
+      document.getElementById('laptopNamaPerangkat').value = '';
+      document.getElementById('laptopPA').value = '';
+      document.getElementById('laptopSerialNumber').value = '';
+      document.getElementById('laptopStatus').value = '';
+    }
+    this.lookupLaptopNIP();
+    document.getElementById('modalEditLaptop').classList.add('open');
+  },
+
+  // ✅ BARU: Auto-lookup Nama Pengguna/Regional dari NIP + tampilkan saran Status Laptop (poin 3 — manual + saran)
+  lookupLaptopNIP() {
+    const nip = document.getElementById('laptopNIP').value.trim();
+    const emp = Utils.findKaryawanByNIP(nip);
+    const editId = AppState.modals.laptopEditId;
+    const existing = (editId !== null && editId !== undefined) ? AppState.laptop.find(l => l.id === editId) : null;
+    const fallback = (existing && existing.NIP === nip) ? existing : null;
+
+    document.getElementById('laptopNamaPenggunaPreview').value = emp ? emp.Nama : (fallback ? fallback.NamaPengguna : '');
+    document.getElementById('laptopSBUPreview').value = emp ? emp.SBU : (fallback ? fallback.SBU : '');
+
+    const currentStatus = document.getElementById('laptopStatus').value;
+    const hasBukti = !!(AppState.modals.pendingBuktiBA || (fallback && fallback.BuktiBA));
+    const suggestion = Utils.suggestStatusLaptop(nip, hasBukti);
+    const note = document.getElementById('laptopStatusSuggestion');
+    if (nip && currentStatus && currentStatus !== suggestion) {
+      note.style.display = 'block';
+      note.textContent = `⚠️ Saran berdasarkan data karyawan: "${suggestion}" (status yang dipilih berbeda).`;
+    } else if (nip) {
+      note.style.display = 'block';
+      note.style.color = 'var(--text2)';
+      note.textContent = `💡 Saran status: "${suggestion}".`;
+    } else {
+      note.style.display = 'none';
+    }
+
+    const warning = document.getElementById('laptopNIPWarning');
+    if (!nip || emp) {
+      warning.style.display = 'none';
+    } else if (fallback) {
+      warning.style.display = 'block';
+      warning.style.color = 'var(--warning)';
+      warning.style.background = 'rgba(234,179,8,.08)';
+      warning.style.borderColor = 'rgba(234,179,8,.25)';
+      warning.textContent = '📌 Karyawan ini sudah tidak ada di Data Karyawan (resign/dihapus). Nama Pengguna/Regional yang ditampilkan adalah data arsip — tetap tersimpan.';
+    } else {
+      warning.style.display = 'block';
+      warning.style.color = 'var(--danger)';
+      warning.style.background = 'rgba(239,68,68,.08)';
+      warning.style.borderColor = 'rgba(239,68,68,.2)';
+      warning.textContent = '⚠️ NIP tidak ditemukan di Data Karyawan. Nama Pengguna/Regional akan dikosongkan.';
+    }
+  },
+
+  // ✅ BARU: Baca & kompres file gambar Bukti Berita Acara Pengembalian sebelum disimpan
+  async handleLaptopFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { Utils.toast('❌ File harus berupa gambar!'); return; }
+    try {
+      const dataUrl = await Utils.compressImageFile(file);
+      AppState.modals.pendingBuktiBA = dataUrl;
+      AppState.modals.pendingBuktiBAFileName = file.name;
+      document.getElementById('laptopBuktiPreviewWrap').style.display = 'block';
+      document.getElementById('laptopBuktiPreviewImg').src = dataUrl;
+      this.lookupLaptopNIP(); // refresh saran status (bukti baru bisa mengubah saran)
+      Utils.toast('✅ Gambar berhasil dimuat — klik Simpan untuk menyimpan data.');
+    } catch (err) {
+      Utils.toast('❌ Gagal memproses gambar: ' + err.message);
+    }
+  },
+
+  // ✅ BARU: Simpan data Laptop manual (tambah baru atau edit), dicatat ke log "laptop"
+  saveLaptopManual() {
+    const nip = document.getElementById('laptopNIP').value.trim();
+    const namaPerangkat = document.getElementById('laptopNamaPerangkat').value.trim();
+    const pa = document.getElementById('laptopPA').value.trim();
+    const serial = document.getElementById('laptopSerialNumber').value.trim();
+    const status = document.getElementById('laptopStatus').value;
+
+    if (!nip) return Utils.toast('❌ NIP wajib diisi!');
+    if (!namaPerangkat) return Utils.toast('❌ Nama Perangkat wajib diisi!');
+    if (!serial) return Utils.toast('❌ Serial Number wajib diisi!');
+
+    const emp = Utils.findKaryawanByNIP(nip);
+    const editId = AppState.modals.laptopEditId;
+    const existing = (editId !== null && editId !== undefined) ? AppState.laptop.find(l => l.id === editId) : null;
+    // ✅ Kalau karyawan sudah resign/dihapus, jangan kosongkan Nama Pengguna/Regional yang sudah tersimpan
+    const enriched = {
+      NIP: nip, NamaPerangkat: namaPerangkat, PA: pa, SerialNumber: serial, Status: status,
+      NamaPengguna: emp ? emp.Nama : (existing ? existing.NamaPengguna : ''),
+      SBU:          emp ? emp.SBU  : (existing ? existing.SBU          : ''),
+      BuktiBA:         AppState.modals.pendingBuktiBA || (existing ? existing.BuktiBA : null),
+      BuktiBAFileName: AppState.modals.pendingBuktiBAFileName || (existing ? existing.BuktiBAFileName : null)
+    };
+
+    if (existing) {
+      const idx = AppState.laptop.findIndex(l => l.id === editId);
+      AppState.laptop[idx] = Models.Laptop({ ...enriched, id: editId });
+      AppState.log.push(Models.LogChange(nip, enriched.NamaPengguna || nip, 'laptop edit',
+        '-', `${namaPerangkat} · ${serial} · ${status || '(belum diisi)'}`, 'Data diedit manual'));
+      Utils.toast('✅ Data laptop berhasil diperbarui');
+    } else {
+      AppState.laptop.push(Models.Laptop(enriched));
+      AppState.log.push(Models.LogChange(nip, enriched.NamaPengguna || nip, 'laptop tambah',
+        '-', `${namaPerangkat} · ${serial} · ${status || '(belum diisi)'}`, 'Data ditambahkan manual'));
+      Utils.toast('✅ Data laptop berhasil ditambahkan');
+    }
+
+    DB.save();
+    closeModal('modalEditLaptop');
+    this.resetLaptopPageAndRender();
+    UI.renderDashboardLaptop();
+  },
+
+  // ✅ BARU: Hapus satu baris data Laptop
+  deleteLaptop(id) {
+    const item = AppState.laptop.find(l => l.id === id);
+    if (!item) return;
+    if (!confirm(`Hapus data laptop "${item.NamaPerangkat}" (SN: ${item.SerialNumber}) milik ${item.NamaPengguna || item.NIP}?`)) return;
+    LaptopService.deleteById(id);
+    AppState.log.push(Models.LogChange(item.NIP, item.NamaPengguna || item.NIP, 'laptop hapus',
+      `${item.NamaPerangkat} · ${item.SerialNumber}`, '-', 'Data laptop dihapus manual'));
+    DB.save();
+    this.resetLaptopPageAndRender();
+    UI.renderDashboardLaptop();
+    Utils.toast('🗑 Data laptop dihapus');
+  },
+
+  // ✅ BARU: Hapus semua data Laptop — validasi sama seperti fitur Hapus Semua lain (wajib ketik "HAPUS SEMUA")
+  openModalHapusSemuaLaptop() {
+    if (!AppState.laptop.length) return Utils.toast('ℹ️ Tidak ada data laptop untuk dihapus.');
+    document.getElementById('deleteAllLaptopCount').textContent = AppState.laptop.length + ' data';
+    document.getElementById('inputKonfirmasiHapusSemuaLaptop').value = '';
+    const btn = document.getElementById('btnConfirmDeleteAllLaptop');
+    btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
+    document.getElementById('modalConfirmDeleteAllLaptop').classList.add('open');
+  },
+
+  confirmHapusSemuaLaptop() {
+    const input = document.getElementById('inputKonfirmasiHapusSemuaLaptop').value;
+    if (input !== 'HAPUS SEMUA') return;
+    const jumlah = AppState.laptop.length;
+    AppState.log.push(Models.LogChange('SYSTEM', 'SYSTEM', 'laptop hapus semua', `${jumlah} data`, '(semua dihapus)'));
+    AppState.laptop = [];
+    AppState.laptopPagination.page = 1;
+    DB.save();
+    UI.closeModal('modalConfirmDeleteAllLaptop');
+    UI.renderLaptopTable();
+    UI.renderDashboardLaptop();
+    Utils.toast(`🗑 Semua data laptop (${jumlah}) berhasil dihapus`);
+  },
+
+  // ✅ BARU: Lihat gambar Bukti Berita Acara Pengembalian ukuran penuh
+  viewBuktiBA(id) {
+    const item = AppState.laptop.find(l => l.id === id);
+    if (!item || !item.BuktiBA) return;
+    document.getElementById('viewBuktiImg').src = item.BuktiBA;
+    document.getElementById('viewBuktiTitle').textContent = `${item.NamaPerangkat} — ${item.SerialNumber}`;
+    document.getElementById('modalViewBukti').classList.add('open');
+  },
+
+  // ✅ BARU: Modal detail informasi peminjaman laptop untuk 1 orang (klik Nama Pengguna di tabel)
+  openLaptopDetailModal(nip) {
+    const items = AppState.laptop.filter(l => l.NIP === nip);
+    if (!items.length) return;
+    const emp = Utils.findKaryawanByNIP(nip);
+    const nama = emp ? emp.Nama : (items[0].NamaPengguna || nip);
+
+    document.getElementById('laptopDetailTitle').textContent = `💻 Riwayat Peminjaman Laptop — ${nama}`;
+    document.getElementById('laptopDetailSubtitle').textContent =
+      `NIP: ${nip} · SBU: ${emp ? emp.SBU : (items[0].SBU || '—')}${emp && emp.Status === 'Resign' ? ' · ⚠️ Status Karyawan: RESIGN' : ''}`;
+
+    const statusPill = { 'Aktif': 'pill-green', 'Belum Dikembalikan': 'pill-red', 'Sudah Dikembalikan': 'pill-blue' };
+    document.getElementById('laptopDetailBody').innerHTML = items.map(l => `
+      <div class="card" style="background:var(--surface2);margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;">
+          <div>
+            <div style="font-weight:600;">${l.NamaPerangkat}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px;">SN: ${l.SerialNumber} · PA: ${l.PA || '—'}</div>
+            <div style="margin-top:6px;"><span class="pill ${statusPill[l.Status] || 'pill-gray'}">${l.Status || 'Belum diisi'}</span></div>
+          </div>
+          ${l.BuktiBA
+            ? `<img src="${l.BuktiBA}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;cursor:pointer;flex-shrink:0;" onclick="Handlers.viewBuktiBA(${l.id})" title="Lihat Bukti Berita Acara">`
+            : `<span style="font-size:11px;color:var(--text2);flex-shrink:0;">Tanpa bukti</span>`}
+        </div>
+      </div>`).join('');
+
+    document.getElementById('modalLaptopDetail').classList.add('open');
+  },
+
+  // ✅ BARU: Export Excel — Tabel Monitoring Laptop (gambar bukti tidak diexport, hanya status ada/tidaknya)
+  exportLaptopExcel() {
+    if (!AppState.laptop.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
+    const rows = AppState.laptop.map((l, i) => ({
+      'No': i + 1, 'Nama Perangkat': l.NamaPerangkat, 'PA': l.PA, 'Nama Pengguna': l.NamaPengguna,
+      'Serial Number': l.SerialNumber, 'Regional (SBU)': l.SBU, 'Status Laptop': l.Status || '',
+      'Bukti Berita Acara': l.BuktiBA ? 'Ada' : 'Belum Ada'
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Monitoring Laptop');
+
+    const laptopLog = AppState.log.filter(c => c.type.startsWith('laptop'));
+    if (laptopLog.length) {
+      const logRows = laptopLog.map(c => ({
+        'Tanggal': c.ts, 'NIP': c.nik, 'Nama': c.nama, 'Tipe': c.type.toUpperCase(),
+        'Data Lama': c.oldVal, 'Data Baru': c.newVal, 'Catatan': c.catatan
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(logRows), 'Log Perubahan Laptop');
+    }
+    XLSX.writeFile(wb, `monitoring-laptop-${Utils.getTodayDate()}.xlsx`);
+    Utils.toast('✅ Excel berhasil diexport!');
+  },
+
+  // ✅ BARU: Export Excel — Dashboard Laptop (ringkasan status per SBU)
+  exportDashboardLaptopExcel() {
+    if (!AppState.laptop.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
+    const sbuList = CONFIG.DEFAULT_SBU;
+    const rows = sbuList.map(sbu => {
+      const entries = AppState.laptop.filter(l => l.SBU === sbu);
+      return {
+        'SBU': sbu, 'Total Laptop': entries.length,
+        'Aktif': entries.filter(l => l.Status === 'Aktif').length,
+        'Belum Dikembalikan': entries.filter(l => l.Status === 'Belum Dikembalikan').length,
+        'Sudah Dikembalikan': entries.filter(l => l.Status === 'Sudah Dikembalikan').length,
+        'Belum Diisi Status': entries.filter(l => !l.Status).length
+      };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Dashboard Laptop');
+    XLSX.writeFile(wb, `dashboard-laptop-${Utils.getTodayDate()}.xlsx`);
+    Utils.toast('✅ Excel berhasil diexport!');
+  },
+
   // ✅ BARU: Buka modal daftar karyawan berdasarkan status (klik card Baru/Aktif/Resign di Dashboard Karyawan)
   openStatusListModal(status) {
     AppState.modals.statusListTarget = status;
@@ -2651,6 +3271,10 @@ window.changeLemburPageSize     = () => Handlers.changeLemburPageSize();      //
 window.exportLemburExcel        = () => Handlers.exportLemburExcel();         // ✅ BARU
 window.exportDashboardNonPOExcel= () => Handlers.exportDashboardNonPOExcel(); // ✅ BARU
 window.openModalLembur          = (id) => Handlers.openLemburModal(id);      // ✅ BARU
+window.openModalLaptop          = (id) => Handlers.openLaptopModal(id);      // ✅ BARU
+window.resetLaptopPageAndRender = () => Handlers.resetLaptopPageAndRender(); // ✅ BARU
+window.changeLaptopPageSize     = () => Handlers.changeLaptopPageSize();     // ✅ BARU
+window.exportLaptopExcel        = () => Handlers.exportLaptopExcel();        // ✅ BARU
 
 // Initialize application
 ThemeService.init();

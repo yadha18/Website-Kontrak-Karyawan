@@ -79,6 +79,11 @@
       <button class="nav-item nav-sub" onclick="Handlers.navigateBulan('Desember 2027')">Desember</button>
     </div>
 
+    <!-- ✅ BARU: Monitoring Pengadaan Laptop -->
+    <div class="nav-label">Monitoring Pengadaan Laptop</div>
+    <button class="nav-item" onclick="navigate('dashboard-laptop')"><span class="icon">💻</span> Dashboard Laptop</button>
+    <button class="nav-item" onclick="navigate('laptop')"><span class="icon">🧾</span> Tabel Monitoring Laptop</button>
+
     <!-- <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button> -->
     <div class="nav-label">Pengaturan</div>
     <button class="nav-item" onclick="navigate('jabatan')"><span class="icon">📋</span> Daftar Jabatan</button>
@@ -210,6 +215,7 @@
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-primary" id="btnUploadTypeKaryawan" onclick="setUploadType('karyawan')">👥 Data Karyawan</button>
           <button class="btn btn-secondary" id="btnUploadTypeLembur" onclick="setUploadType('lembur')">🧾 Data Lembur & SPPD Karyawan</button>
+          <button class="btn btn-secondary" id="btnUploadTypeLaptop" onclick="setUploadType('laptop')">💻 Monitoring Pengadaan Laptop</button>
         </div>
         <div id="uploadTypeDesc" style="margin-top:12px;font-size:12px;color:var(--text2);line-height:1.6;"></div>
       </div>
@@ -313,7 +319,7 @@
     <div class="page" id="page-lembur-bulan">
       <div class="page-header">
         <h1 id="lemburBulanTitle">📅 Data Lembur & SPPD</h1>
-        <p>Breakdown per bulan — pilih bulan lain lewat menu di samping.</p>
+        <p>Breakdown per bulan — pilih bulan lain lewat menu "2026" di samping.</p>
       </div>
 
       <div style="display:flex;gap:10px;margin-bottom:16px;">
@@ -373,6 +379,65 @@
         <div class="flex-end">
           <button class="btn btn-success" onclick="exportLemburExcel()">⬇ Export Excel Data Lembur &amp; SPPD</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ✅ BARU: Dashboard Laptop -->
+    <div class="page" id="page-dashboard-laptop">
+      <div class="page-header">
+        <h1>💻 Dashboard Laptop</h1>
+        <p>Ringkasan status pengadaan laptop per SBU.</p>
+      </div>
+      <div class="card" id="laptop-summary-card"></div>
+      <div class="card">
+        <div class="card-title">📊 Rincian Status Laptop per SBU</div>
+        <div id="laptop-nonpo-table"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔄 Review Log Perubahan — Monitoring Laptop</div>
+        <div id="laptop-log-table"></div>
+      </div>
+    </div>
+
+    <!-- ✅ BARU: Tabel Monitoring Pengadaan Laptop -->
+    <div class="page" id="page-laptop">
+      <div class="page-header">
+        <h1>🧾 Tabel Monitoring Pengadaan Laptop</h1>
+        <p>Data laptop yang dipinjamkan ke karyawan. Klik nama pengguna untuk lihat riwayat peminjamannya.</p>
+      </div>
+      <div class="flex-end" style="margin-bottom:12px;gap:10px;">
+        <button class="btn btn-danger" onclick="Handlers.openModalHapusSemuaLaptop()">🗑 Hapus Semua Data</button>
+        <button class="btn btn-primary" onclick="openModalLaptop(null)">➕ Tambah Data Manual</button>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchLaptop" placeholder="🔍  Cari NIP, Nama, atau Serial Number..." oninput="resetLaptopPageAndRender()">
+        <select id="filterLaptopSBU" onchange="resetLaptopPageAndRender()"><option value="">Semua SBU</option></select>
+        <select id="filterLaptopStatus" onchange="resetLaptopPageAndRender()"><option value="">Semua Status</option></select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Aksi</th><th>No</th><th>Nama Perangkat</th><th>PA</th><th>Nama Pengguna</th>
+            <th>Serial Number</th><th>Regional (SBU)</th><th>Status Laptop</th><th>Bukti BA</th>
+          </tr></thead>
+          <tbody id="laptopBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination-container" id="paginationLaptop" style="display: none;">
+        <div class="page-info">
+          Menampilkan
+          <select id="laptopPageSize" onchange="changeLaptopPageSize()">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          data per halaman. Total: <span id="totalLaptopData" style="font-weight:600;color:var(--text)">0</span> data.
+        </div>
+        <div class="page-controls" id="laptopPageControls"></div>
+      </div>
+      <div class="flex-end">
+        <button class="btn btn-success" onclick="exportLaptopExcel()">⬇ Export Excel Monitoring Laptop</button>
       </div>
     </div>
 
@@ -861,6 +926,133 @@
     <div class="flex-end" style="margin-top: 15px;">
       <button class="btn btn-secondary" onclick="closeModal('modalEditLembur')">Batal</button>
       <button class="btn btn-primary" onclick="Handlers.saveLemburManual()">Simpan Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal Tambah/Edit Manual — Monitoring Pengadaan Laptop -->
+<div class="modal-overlay" id="modalEditLaptop">
+  <div class="modal" style="width: 560px;">
+    <div class="modal-header">
+      <h2 id="modalLaptopTitle">➕ Tambah Data Laptop</h2>
+      <button class="modal-close" onclick="closeModal('modalEditLaptop')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">NIP <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" id="laptopNIP" placeholder="ex: 123456789ICN" oninput="Handlers.lookupLaptopNIP()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nama Pengguna (otomatis)</label>
+        <input type="text" class="form-control" id="laptopNamaPenggunaPreview" disabled>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Regional / SBU (otomatis)</label>
+        <input type="text" class="form-control" id="laptopSBUPreview" disabled>
+      </div>
+      <div class="form-group">
+        <label class="form-label">PA</label>
+        <input type="text" class="form-control" id="laptopPA" placeholder="cth: PA-2026-001">
+      </div>
+    </div>
+    <div id="laptopNIPWarning" class="info-note" style="display:none;">
+      ⚠️ NIP tidak ditemukan di Data Karyawan. Nama Pengguna/Regional akan dikosongkan.
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nama Perangkat <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" id="laptopNamaPerangkat" placeholder="cth: Lenovo ThinkPad T14">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Serial Number <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" id="laptopSerialNumber" placeholder="cth: PF3ABCDE">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Status Laptop</label>
+        <select class="form-control" id="laptopStatus" onchange="Handlers.lookupLaptopNIP()">
+          <option value="">— Belum diisi —</option>
+          <option value="Aktif">Aktif</option>
+          <option value="Belum Dikembalikan">Belum Dikembalikan</option>
+          <option value="Sudah Dikembalikan">Sudah Dikembalikan</option>
+        </select>
+        <div id="laptopStatusSuggestion" class="info-note" style="display:none;margin-top:8px;"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Bukti Berita Acara Pengembalian (gambar)</label>
+      <input type="file" accept="image/*" class="form-control" id="laptopFileInput" onchange="Handlers.handleLaptopFile(event)">
+      <div id="laptopBuktiPreviewWrap" style="display:none;margin-top:10px;">
+        <img id="laptopBuktiPreviewImg" style="max-width:160px;max-height:160px;border-radius:8px;border:1px solid var(--border);">
+      </div>
+    </div>
+    <div class="flex-end" style="margin-top: 15px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalEditLaptop')">Batal</button>
+      <button class="btn btn-primary" onclick="Handlers.saveLaptopManual()">Simpan Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal Konfirmasi Hapus Semua Data Laptop -->
+<div class="modal-overlay" id="modalConfirmDeleteAllLaptop">
+  <div class="modal" style="width: 480px;">
+    <div class="modal-header">
+      <h2>🗑 Hapus Semua Data Laptop</h2>
+      <button class="modal-close" onclick="closeModal('modalConfirmDeleteAllLaptop')">✕</button>
+    </div>
+    <div class="info-note" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:var(--danger);margin-bottom:20px;">
+      ⚠️ <strong>Peringatan keras!</strong> Seluruh data monitoring laptop akan dihapus permanen dan tidak dapat dikembalikan.
+    </div>
+    <div class="card" style="background:var(--surface2);border-color:var(--border2);margin-bottom:20px;">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase;">Ringkasan data yang akan dihapus</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;">
+        <span style="color:var(--text2);">Total Data Laptop</span>
+        <span style="font-weight:700;color:var(--danger);" id="deleteAllLaptopCount">0</span>
+        <span style="color:var(--text2);">Log Perubahan</span>
+        <span style="color:var(--text2);font-size:12px;">Akan tetap disimpan</span>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:20px;">
+      <label class="form-label" style="color:var(--danger);">Ketik <strong>HAPUS SEMUA</strong> untuk konfirmasi</label>
+      <input type="text" class="form-control" id="inputKonfirmasiHapusSemuaLaptop" placeholder="HAPUS SEMUA"
+        oninput="Handlers.validateHapusSemuaInput('inputKonfirmasiHapusSemuaLaptop','btnConfirmDeleteAllLaptop')"
+        style="border-color:rgba(239,68,68,.4);">
+    </div>
+    <div class="flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modalConfirmDeleteAllLaptop')">Batal</button>
+      <button class="btn btn-danger" id="btnConfirmDeleteAllLaptop" onclick="Handlers.confirmHapusSemuaLaptop()" disabled style="background:var(--danger);color:#fff;opacity:0.5;cursor:not-allowed;">🗑 Hapus Semua Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal Lihat Gambar Bukti Berita Acara Pengembalian -->
+<div class="modal-overlay" id="modalViewBukti">
+  <div class="modal" style="width: 480px;">
+    <div class="modal-header">
+      <h2 id="viewBuktiTitle">Bukti Berita Acara</h2>
+      <button class="modal-close" onclick="closeModal('modalViewBukti')">✕</button>
+    </div>
+    <img id="viewBuktiImg" style="width:100%;border-radius:10px;border:1px solid var(--border);">
+    <div class="flex-end" style="margin-top: 15px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalViewBukti')">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ BARU: Modal Detail Riwayat Peminjaman Laptop per Karyawan -->
+<div class="modal-overlay" id="modalLaptopDetail">
+  <div class="modal" style="width: 560px;">
+    <div class="modal-header">
+      <h2 id="laptopDetailTitle">💻 Riwayat Peminjaman Laptop</h2>
+      <button class="modal-close" onclick="closeModal('modalLaptopDetail')">✕</button>
+    </div>
+    <div id="laptopDetailSubtitle" style="font-size:12px;color:var(--text2);margin-bottom:14px;"></div>
+    <div id="laptopDetailBody" style="max-height:420px;overflow-y:auto;"></div>
+    <div class="flex-end" style="margin-top: 15px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalLaptopDetail')">Tutup</button>
     </div>
   </div>
 </div>
