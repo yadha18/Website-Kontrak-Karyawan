@@ -939,18 +939,18 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">NIP <span style="color:var(--danger)">*</span></label>
-        <input type="text" class="form-control" id="laptopNIP" placeholder="ex: 123456789ICN" oninput="Handlers.lookupLaptopNIP()">
+        <label class="form-label">NIP <span style="color:var(--text2);font-weight:400;">(opsional)</span></label>
+        <input type="text" class="form-control" id="laptopNIP" placeholder="ex: 123456789ICN — boleh dikosongkan" oninput="Handlers.lookupLaptopNIP()">
       </div>
       <div class="form-group">
-        <label class="form-label">Nama Pengguna (otomatis)</label>
-        <input type="text" class="form-control" id="laptopNamaPenggunaPreview" disabled>
+        <label class="form-label">Nama Pengguna <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" id="laptopNamaPengguna" placeholder="Otomatis kalau NIP ditemukan, atau isi manual">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Regional / SBU (otomatis)</label>
-        <input type="text" class="form-control" id="laptopSBUPreview" disabled>
+        <label class="form-label">Regional / SBU <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" id="laptopSBU"></select>
       </div>
       <div class="form-group">
         <label class="form-label">PA</label>
@@ -958,7 +958,7 @@
       </div>
     </div>
     <div id="laptopNIPWarning" class="info-note" style="display:none;">
-      ⚠️ NIP tidak ditemukan di Data Karyawan. Nama Pengguna/Regional akan dikosongkan.
+      ℹ️ NIP tidak ditemukan di Data Karyawan — isi Nama Pengguna &amp; Regional secara manual.
     </div>
     <div class="form-row">
       <div class="form-group">

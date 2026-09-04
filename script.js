@@ -1011,13 +1011,16 @@ const LaptopService = {
     };
   },
 
+  // ✅ DIUBAH: NIP tidak lagi wajib — kalau NIP kosong, kolom Nama Pengguna di Excel wajib diisi
+  // supaya identitas peminjam tetap jelas.
   classifyUploadRows(rows) {
     return rows.map(raw => {
       const nip = String(raw.NIP || '').trim();
+      const namaPengguna = String(raw.NamaPengguna || '').trim();
       const namaPerangkat = String(raw.NamaPerangkat || '').trim();
       const serial = String(raw.SerialNumber || '').trim();
       let status;
-      if (!nip) status = 'invalid_nip';
+      if (!nip && !namaPengguna) status = 'invalid_identitas';
       else if (!namaPerangkat) status = 'invalid_perangkat';
       else if (!serial) status = 'invalid_serial';
       else status = 'new';
@@ -1767,7 +1770,7 @@ const UI = {
         <td class="mono" style="text-align:center;">${startIdx + i + 1}</td>
         <td>${l.NamaPerangkat || '—'}</td>
         <td>${l.PA || '—'}</td>
-        <td style="font-weight:500;color:var(--accent2);cursor:pointer;" onclick="Handlers.openLaptopDetailModal('${l.NIP}')" title="Lihat detail peminjaman">${l.NamaPengguna || '—'}</td>
+        <td${l.NIP ? ` style="font-weight:500;color:var(--accent2);cursor:pointer;" onclick="Handlers.openLaptopDetailModal('${l.NIP}')" title="Lihat detail peminjaman"` : ''}>${l.NamaPengguna || '—'}</td>
         <td class="mono">${l.SerialNumber || '—'}</td>
         <td>${l.SBU || '—'}</td>
         <td>
@@ -1937,8 +1940,8 @@ const Handlers = {
         desc.innerHTML = `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (Bulan: "Januari"–"Desember" ${CONFIG.TAHUN_LEMBUR_LIST.join('/')}; Tagihan: "SPPD 1 2" atau "Lembur").<br>
            ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari Data Karyawan berdasarkan NIP — cukup isi NIP di file Excel.`;
       } else {
-        desc.innerHTML = `Kolom: <strong>NIP, Nama Perangkat, PA, Serial Number, Status</strong> (Status: "Aktif", "Belum Dikembalikan", atau "Sudah Dikembalikan" — boleh dikosongkan).<br>
-           ℹ️ Nama Pengguna &amp; Regional (SBU) otomatis diambil dari Data Karyawan berdasarkan NIP. Kolom opsional <strong>Nama Pengguna</strong> &amp; <strong>Regional</strong> dipakai sebagai cadangan kalau NIP tidak ditemukan (mis. karyawan sudah dihapus).<br>
+        desc.innerHTML = `Kolom: <strong>NIP (opsional), Nama Perangkat, PA, Serial Number, Status</strong> (Status: "Aktif", "Belum Dikembalikan", atau "Sudah Dikembalikan" — boleh dikosongkan).<br>
+           ℹ️ NIP <strong>tidak wajib</strong> — kalau diisi &amp; ditemukan di Data Karyawan, Nama Pengguna &amp; Regional (SBU) otomatis terisi. Kalau NIP kosong/tidak ditemukan, isi kolom <strong>Nama Pengguna</strong> &amp; <strong>Regional</strong> secara manual di Excel (wajib salah satu dari NIP/Nama Pengguna terisi).<br>
            📎 <strong>Bukti Berita Acara Pengembalian</strong> (gambar) tidak bisa diupload lewat Excel — upload manual per laptop lewat tombol ✏️ Edit setelah data masuk.`;
       }
     }
@@ -2097,12 +2100,12 @@ const Handlers = {
 
     const classified = LaptopService.classifyUploadRows(AppState.previewUpload);
     const statusBadge = {
-      new:               '<span class="pill pill-green">✔ Valid</span>',
-      invalid_nip:       '<span class="pill pill-red">✕ NIP Kosong</span>',
-      invalid_perangkat: '<span class="pill pill-red">✕ Nama Perangkat Kosong</span>',
-      invalid_serial:    '<span class="pill pill-red">✕ Serial Number Kosong</span>'
+      new:                '<span class="pill pill-green">✔ Valid</span>',
+      invalid_identitas:  '<span class="pill pill-red">✕ NIP &amp; Nama Pengguna Kosong</span>',
+      invalid_perangkat:  '<span class="pill pill-red">✕ Nama Perangkat Kosong</span>',
+      invalid_serial:     '<span class="pill pill-red">✕ Serial Number Kosong</span>'
     };
-    const rowClass = { new: '', invalid_nip: 'style="opacity:0.4"', invalid_perangkat: 'style="opacity:0.4"', invalid_serial: 'style="opacity:0.4"' };
+    const rowClass = { new: '', invalid_identitas: 'style="opacity:0.4"', invalid_perangkat: 'style="opacity:0.4"', invalid_serial: 'style="opacity:0.4"' };
 
     const stats = {
       total: classified.length,
@@ -2877,11 +2880,15 @@ const Handlers = {
     document.getElementById('modalLaptopTitle').textContent = isEdit ? '✏️ Edit Data Laptop' : '➕ Tambah Data Laptop';
     document.getElementById('laptopFileInput').value = '';
     document.getElementById('laptopBuktiPreviewWrap').style.display = 'none';
+    Utils.fillSelect('laptopSBU', CONFIG.DEFAULT_SBU); // ✅ BARU: isi opsi dropdown Regional/SBU (fillSelect menambahkan opsi "Semua" — dihapus di bawah)
+    document.querySelector('#laptopSBU option[value=""]').textContent = '— Pilih Regional/SBU —';
 
     if (isEdit) {
       const item = AppState.laptop.find(l => l.id === id);
       if (!item) return;
       document.getElementById('laptopNIP').value = item.NIP;
+      document.getElementById('laptopNamaPengguna').value = item.NamaPengguna;
+      document.getElementById('laptopSBU').value = item.SBU;
       document.getElementById('laptopNamaPerangkat').value = item.NamaPerangkat;
       document.getElementById('laptopPA').value = item.PA;
       document.getElementById('laptopSerialNumber').value = item.SerialNumber;
@@ -2892,6 +2899,8 @@ const Handlers = {
       }
     } else {
       document.getElementById('laptopNIP').value = '';
+      document.getElementById('laptopNamaPengguna').value = '';
+      document.getElementById('laptopSBU').value = '';
       document.getElementById('laptopNamaPerangkat').value = '';
       document.getElementById('laptopPA').value = '';
       document.getElementById('laptopSerialNumber').value = '';
@@ -2901,25 +2910,28 @@ const Handlers = {
     document.getElementById('modalEditLaptop').classList.add('open');
   },
 
-  // ✅ BARU: Auto-lookup Nama Pengguna/Regional dari NIP + tampilkan saran Status Laptop (poin 3 — manual + saran)
+  // ✅ DIUBAH: NIP sekarang OPSIONAL — dipakai untuk auto-isi Nama Pengguna & Regional kalau ditemukan
+  // di Data Karyawan, tapi field Nama Pengguna & Regional tetap bisa diisi/diubah manual kapan saja.
   lookupLaptopNIP() {
     const nip = document.getElementById('laptopNIP').value.trim();
     const emp = Utils.findKaryawanByNIP(nip);
-    const editId = AppState.modals.laptopEditId;
-    const existing = (editId !== null && editId !== undefined) ? AppState.laptop.find(l => l.id === editId) : null;
-    const fallback = (existing && existing.NIP === nip) ? existing : null;
 
-    document.getElementById('laptopNamaPenggunaPreview').value = emp ? emp.Nama : (fallback ? fallback.NamaPengguna : '');
-    document.getElementById('laptopSBUPreview').value = emp ? emp.SBU : (fallback ? fallback.SBU : '');
+    // Auto-isi HANYA kalau NIP ditemukan di Data Karyawan — kalau tidak, biarkan isian manual apa adanya.
+    if (emp) {
+      document.getElementById('laptopNamaPengguna').value = emp.Nama;
+      document.getElementById('laptopSBU').value = emp.SBU;
+    }
 
+    const namaPengguna = document.getElementById('laptopNamaPengguna').value.trim();
     const currentStatus = document.getElementById('laptopStatus').value;
-    const hasBukti = !!(AppState.modals.pendingBuktiBA || (fallback && fallback.BuktiBA));
+    const hasBukti = !!(AppState.modals.pendingBuktiBA || document.getElementById('laptopBuktiPreviewWrap').style.display === 'block');
     const suggestion = Utils.suggestStatusLaptop(nip, hasBukti);
     const note = document.getElementById('laptopStatusSuggestion');
-    if (nip && currentStatus && currentStatus !== suggestion) {
+    if (namaPengguna && currentStatus && currentStatus !== suggestion) {
       note.style.display = 'block';
+      note.style.color = 'var(--warning)';
       note.textContent = `⚠️ Saran berdasarkan data karyawan: "${suggestion}" (status yang dipilih berbeda).`;
-    } else if (nip) {
+    } else if (namaPengguna) {
       note.style.display = 'block';
       note.style.color = 'var(--text2)';
       note.textContent = `💡 Saran status: "${suggestion}".`;
@@ -2928,21 +2940,7 @@ const Handlers = {
     }
 
     const warning = document.getElementById('laptopNIPWarning');
-    if (!nip || emp) {
-      warning.style.display = 'none';
-    } else if (fallback) {
-      warning.style.display = 'block';
-      warning.style.color = 'var(--warning)';
-      warning.style.background = 'rgba(234,179,8,.08)';
-      warning.style.borderColor = 'rgba(234,179,8,.25)';
-      warning.textContent = '📌 Karyawan ini sudah tidak ada di Data Karyawan (resign/dihapus). Nama Pengguna/Regional yang ditampilkan adalah data arsip — tetap tersimpan.';
-    } else {
-      warning.style.display = 'block';
-      warning.style.color = 'var(--danger)';
-      warning.style.background = 'rgba(239,68,68,.08)';
-      warning.style.borderColor = 'rgba(239,68,68,.2)';
-      warning.textContent = '⚠️ NIP tidak ditemukan di Data Karyawan. Nama Pengguna/Regional akan dikosongkan.';
-    }
+    warning.style.display = (nip && !emp) ? 'block' : 'none';
   },
 
   // ✅ BARU: Baca & kompres file gambar Bukti Berita Acara Pengembalian sebelum disimpan
@@ -2964,25 +2962,27 @@ const Handlers = {
   },
 
   // ✅ BARU: Simpan data Laptop manual (tambah baru atau edit), dicatat ke log "laptop"
+  // ✅ DIUBAH: NIP tidak lagi wajib — Nama Pengguna & Regional diambil langsung dari isian form
+  // (yang sudah otomatis terisi dari NIP kalau ketemu, atau diisi manual oleh user).
   saveLaptopManual() {
     const nip = document.getElementById('laptopNIP').value.trim();
+    const namaPengguna = document.getElementById('laptopNamaPengguna').value.trim();
+    const sbu = document.getElementById('laptopSBU').value;
     const namaPerangkat = document.getElementById('laptopNamaPerangkat').value.trim();
     const pa = document.getElementById('laptopPA').value.trim();
     const serial = document.getElementById('laptopSerialNumber').value.trim();
     const status = document.getElementById('laptopStatus').value;
 
-    if (!nip) return Utils.toast('❌ NIP wajib diisi!');
+    if (!namaPengguna) return Utils.toast('❌ Nama Pengguna wajib diisi!');
+    if (!sbu) return Utils.toast('❌ Regional/SBU wajib dipilih!');
     if (!namaPerangkat) return Utils.toast('❌ Nama Perangkat wajib diisi!');
     if (!serial) return Utils.toast('❌ Serial Number wajib diisi!');
 
-    const emp = Utils.findKaryawanByNIP(nip);
     const editId = AppState.modals.laptopEditId;
     const existing = (editId !== null && editId !== undefined) ? AppState.laptop.find(l => l.id === editId) : null;
-    // ✅ Kalau karyawan sudah resign/dihapus, jangan kosongkan Nama Pengguna/Regional yang sudah tersimpan
     const enriched = {
-      NIP: nip, NamaPerangkat: namaPerangkat, PA: pa, SerialNumber: serial, Status: status,
-      NamaPengguna: emp ? emp.Nama : (existing ? existing.NamaPengguna : ''),
-      SBU:          emp ? emp.SBU  : (existing ? existing.SBU          : ''),
+      NIP: nip, NamaPengguna: namaPengguna, SBU: sbu,
+      NamaPerangkat: namaPerangkat, PA: pa, SerialNumber: serial, Status: status,
       BuktiBA:         AppState.modals.pendingBuktiBA || (existing ? existing.BuktiBA : null),
       BuktiBAFileName: AppState.modals.pendingBuktiBAFileName || (existing ? existing.BuktiBAFileName : null)
     };
@@ -2990,12 +2990,12 @@ const Handlers = {
     if (existing) {
       const idx = AppState.laptop.findIndex(l => l.id === editId);
       AppState.laptop[idx] = Models.Laptop({ ...enriched, id: editId });
-      AppState.log.push(Models.LogChange(nip, enriched.NamaPengguna || nip, 'laptop edit',
+      AppState.log.push(Models.LogChange(nip || '-', namaPengguna, 'laptop edit',
         '-', `${namaPerangkat} · ${serial} · ${status || '(belum diisi)'}`, 'Data diedit manual'));
       Utils.toast('✅ Data laptop berhasil diperbarui');
     } else {
       AppState.laptop.push(Models.Laptop(enriched));
-      AppState.log.push(Models.LogChange(nip, enriched.NamaPengguna || nip, 'laptop tambah',
+      AppState.log.push(Models.LogChange(nip || '-', namaPengguna, 'laptop tambah',
         '-', `${namaPerangkat} · ${serial} · ${status || '(belum diisi)'}`, 'Data ditambahkan manual'));
       Utils.toast('✅ Data laptop berhasil ditambahkan');
     }
