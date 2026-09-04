@@ -261,7 +261,7 @@ const Models = {
       NamaPengguna:    String(data.NamaPengguna || '').trim(),
       SerialNumber:    String(data.SerialNumber || '').trim(),
       SBU:             Utils.resolveSBU(String(data.SBU || '').trim()),
-      Status:          CONFIG.STATUS_LAPTOP_OPTIONS.includes(data.Status) ? data.Status : '',
+      Status:          Utils.normalizeStatusLaptop(data.Status),
       BuktiBA:         data.BuktiBA || null,          // base64 data URL gambar berita acara (dikompres)
       BuktiBAFileName: data.BuktiBAFileName || null
     };
@@ -499,6 +499,19 @@ const Utils = {
     if (/^sppd/i.test(s)) return 'SPPD 1 2';
     if (/^lembur$/i.test(s)) return 'Lembur';
     return s;
+  },
+  // ✅ BARU: Normalisasi nilai Status Laptop — supaya "aktif", "AKTIF ", "Aktif" dari Excel/manual
+  // semua terbaca sebagai status baku "Aktif" (begitu juga 2 status lainnya), bukan malah dikosongkan.
+  normalizeStatusLaptop(val) {
+    const s = String(val || '').trim();
+    if (!s) return '';
+    const exact = CONFIG.STATUS_LAPTOP_OPTIONS.find(o => o.toLowerCase() === s.toLowerCase());
+    if (exact) return exact;
+    const lower = s.toLowerCase();
+    if (lower.startsWith('aktif')) return 'Aktif';
+    if (lower.includes('belum')) return 'Belum Dikembalikan';
+    if (lower.includes('sudah') || lower.includes('kembali')) return 'Sudah Dikembalikan';
+    return '';
   },
   // ✅ BARU: Cari karyawan berdasarkan NIP — dengan fallback toleran angka 0 di depan.
   // Kasus nyata: NIP di Excel Karyawan tersimpan sebagai teks ("0012345678"), tapi di Excel
@@ -2124,9 +2137,12 @@ const Handlers = {
     }
 
     const displayCols = ['NIP', 'NamaPerangkat', 'PA', 'SerialNumber', 'Status'];
-    document.getElementById('previewHead').innerHTML = '<th>Status</th>' + displayCols.map(c => `<th>${COL_LABEL[c] || c}</th>`).join('');
+    document.getElementById('previewHead').innerHTML = '<th>Validasi</th>' + displayCols.map(c => `<th>${COL_LABEL[c] || c}</th>`).join('');
     document.getElementById('previewBody').innerHTML = classified.slice(0, 50).map(r => `
-      <tr ${rowClass[r.__uploadStatus]}><td>${statusBadge[r.__uploadStatus]}</td>${displayCols.map(c => `<td class="${c === 'NIP' ? 'mono' : ''}">${r[c]}</td>`).join('')}</tr>
+      <tr ${rowClass[r.__uploadStatus]}><td>${statusBadge[r.__uploadStatus]}</td>${displayCols.map(c => {
+        const val = c === 'Status' ? (Utils.normalizeStatusLaptop(r[c]) || '<span style="color:var(--text2)">(belum diisi)</span>') : r[c];
+        return `<td class="${c === 'NIP' ? 'mono' : ''}">${val}</td>`;
+      }).join('')}</tr>
     `).join('') + (classified.length > 50 ? `<tr><td colspan="${displayCols.length + 1}" style="text-align:center;color:var(--text2);">... dan ${classified.length - 50} baris lainnya</td></tr>` : '');
 
     document.getElementById('previewCard').style.display = 'block';
