@@ -2096,21 +2096,47 @@ const Handlers = {
 
   // ✅ BARU: Baca & preview file Excel untuk Monitoring Pengadaan Laptop.
   // Nama Pengguna & Regional bersifat opsional (cadangan) — akan ditimpa data Karyawan kalau NIP ketemu.
+  // ✅ DIUBAH: Pencocokan header Excel sekarang lebih toleran (mengabaikan spasi/tanda baca/huruf besar-kecil
+  // dan mengenali beberapa alias per kolom) — supaya header seperti "Status Laptop" atau "Regional (SBU)"
+  // tetap terbaca meski tidak persis sama dengan nama kolom di sistem.
   processExcelLaptop(raw) {
-    const COLS = ['NIP', 'NamaPerangkat', 'PA', 'SerialNumber', 'Status', 'NamaPengguna', 'SBU'];
-    const COL_LABEL = { NamaPerangkat: 'Nama Perangkat', SerialNumber: 'Serial Number', NamaPengguna: 'Nama Pengguna', SBU: 'Regional' };
+    const COL_ALIASES = {
+      NIP:           ['nip'],
+      NamaPerangkat: ['namaperangkat', 'perangkat'],
+      PA:            ['pa'],
+      SerialNumber:  ['serialnumber', 'serial', 'sn'],
+      Status:        ['statuslaptop', 'status'],
+      NamaPengguna:  ['namapengguna', 'pengguna'],
+      SBU:           ['regionalsbu', 'regional', 'sbu']
+    };
+    const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const header = raw[0].map(h => String(h).trim());
+    const normHeader = header.map(norm);
+
+    const findColIdx = (col) => {
+      const aliases = COL_ALIASES[col];
+      // Coba exact match dulu (paling akurat)
+      let idx = normHeader.findIndex(h => aliases.includes(h));
+      if (idx >= 0) return idx;
+      // Fallback: header MENGANDUNG alias (mis. "statuslaptop" mengandung "status") — hanya untuk alias ≥4 huruf
+      idx = normHeader.findIndex(h => aliases.some(a => a.length >= 4 && h.includes(a)));
+      return idx;
+    };
+
+    const COLS = ['NIP', 'NamaPerangkat', 'PA', 'SerialNumber', 'Status', 'NamaPengguna', 'SBU'];
+    const colIdx = {};
+    COLS.forEach(col => { colIdx[col] = findColIdx(col); });
 
     AppState.previewUpload = raw.slice(1).map(row => {
       let obj = {};
       COLS.forEach(col => {
-        const label = COL_LABEL[col] || col;
-        const idx = header.findIndex(h => h.toLowerCase() === label.toLowerCase() || h.toLowerCase() === col.toLowerCase());
-        obj[col] = idx >= 0 ? String(row[idx]) : '';
+        const idx = colIdx[col];
+        obj[col] = idx >= 0 ? String(row[idx] ?? '') : '';
       });
       return obj;
     }).filter(r => r.NIP || r.NamaPerangkat || r.SerialNumber);
 
+    const COL_LABEL = { NamaPerangkat: 'Nama Perangkat', SerialNumber: 'Serial Number', NamaPengguna: 'Nama Pengguna', SBU: 'Regional' };
     const classified = LaptopService.classifyUploadRows(AppState.previewUpload);
     const statusBadge = {
       new:                '<span class="pill pill-green">✔ Valid</span>',
