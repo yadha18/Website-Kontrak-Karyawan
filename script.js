@@ -1756,7 +1756,7 @@ const UI = {
     if (!tbody) return;
 
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">💻</div><h3>Tidak ada data</h3></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-icon">💻</div><h3>Tidak ada data</h3></div></td></tr>`;
       if (pageContainer) pageContainer.style.display = 'none';
       return;
     }
@@ -1781,6 +1781,7 @@ const UI = {
           <button class="btn btn-danger btn-sm" onclick="Handlers.deleteLaptop(${l.id})">🗑</button>
         </td>
         <td class="mono" style="text-align:center;">${startIdx + i + 1}</td>
+        <td class="mono">${l.NIP || '—'}</td>
         <td>${l.NamaPerangkat || '—'}</td>
         <td>${l.PA || '—'}</td>
         <td${l.NIP ? ` style="font-weight:500;color:var(--accent2);cursor:pointer;" onclick="Handlers.openLaptopDetailModal('${l.NIP}')" title="Lihat detail peminjaman"` : ''}>${l.NamaPengguna || '—'}</td>
