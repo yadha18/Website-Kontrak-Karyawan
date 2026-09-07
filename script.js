@@ -2298,9 +2298,38 @@ const Handlers = {
           <thead><tr><th>Jabatan</th><th>Mulai</th><th>Selesai</th><th>Durasi Menjabat</th></tr></thead>
           <tbody>${historyRows || `<tr><td colspan="4"><div class="empty" style="padding:24px"><h3>Belum ada histori</h3></div></td></tr>`}</tbody>
         </table>
-      </div>`;
+      </div>
+
+      <div class="detail-section-title">💻 Data Monitoring Laptop</div>
+      ${this.buildLaptopDetailHTML(emp.NIP)}`;
 
     document.getElementById('modalDetailKaryawan').classList.add('open');
+  },
+
+  // ✅ BARU: Bangun HTML daftar laptop untuk 1 NIP — dipakai di modal Detail Karyawan.
+  // NIP kosong atau "0" pada data laptop diabaikan (tidak dianggap tersinkron ke karyawan manapun).
+  buildLaptopDetailHTML(nip) {
+    const nipValid = nip && nip !== '0';
+    const items = nipValid ? AppState.laptop.filter(l => l.NIP && l.NIP !== '0' && l.NIP === nip) : [];
+
+    if (!items.length) {
+      return `<div class="empty" style="padding:24px"><h3>Belum ada data laptop</h3><p>Tidak ada catatan laptop untuk NIP ini di Monitoring Pengadaan Laptop.</p></div>`;
+    }
+
+    const statusPill = { 'Aktif': 'pill-green', 'Belum Dikembalikan': 'pill-red', 'Sudah Dikembalikan': 'pill-blue' };
+    return items.map(l => `
+      <div class="card" style="background:var(--surface2);margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;">
+          <div>
+            <div style="font-weight:600;">${l.NamaPerangkat}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px;">SN: ${l.SerialNumber} · PA: ${l.PA || '—'} · Regional: ${l.SBU || '—'}</div>
+            <div style="margin-top:6px;"><span class="pill ${statusPill[l.Status] || 'pill-gray'}">${l.Status || 'Belum diisi'}</span></div>
+          </div>
+          ${l.BuktiBA
+            ? `<img src="${l.BuktiBA}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;cursor:pointer;flex-shrink:0;" onclick="Handlers.viewBuktiBA(${l.id})" title="Lihat Bukti Berita Acara">`
+            : `<span style="font-size:11px;color:var(--text2);flex-shrink:0;">Tanpa bukti</span>`}
+        </div>
+      </div>`).join('');
   },
 
   // ✅ DIUBAH: openEditModal — tambah populate dropdown BKO Jabatan & BKO SBU
