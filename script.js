@@ -1663,12 +1663,8 @@ const UI = {
           <div class="card-title" style="margin:0;">💰 Ringkasan Realisasi</div>
           <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardNonPOExcel()">⬇ Export Excel</button>
         </div>
-        <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
           <div class="stat-card"><div class="stat-label">Total Realisasi SPPD/Lembur</div><div class="stat-value accent">${Utils.formatRupiah(totalRealisasi)}</div></div>
-          <div class="stat-card">
-            <div class="stat-label">🎫 Tiket Dibelikan HPI</div>
-            <input type="number" min="0" class="form-control" style="margin-top:6px;" value="${tiketHPI}" onchange="Handlers.updateTiketHPI(this.value)">
-          </div>
           <div class="stat-card"><div class="stat-label">Man Fee (7%)</div><div class="stat-value warning">${Utils.formatRupiah(manFee)}</div></div>
           <div class="stat-card"><div class="stat-label">Grand Total</div><div class="stat-value success">${Utils.formatRupiah(grandTotal)}</div></div>
         </div>`;
@@ -1691,9 +1687,9 @@ const UI = {
                 return `
                 <tr>
                   <td style="white-space:nowrap;font-weight:500;">${r.sbu}</td>
-                  <td><input type="number" min="0" class="form-control mono" style="min-width:130px" value="${r.cfg.paguNonPO || 0}" onchange="Handlers.updateLemburConfig('${sbuEsc}','paguNonPO',this.value)"></td>
+                  <td><input type="text" inputmode="numeric" class="form-control mono" style="min-width:130px" value="${Utils.formatRupiah(r.cfg.paguNonPO || 0)}" onchange="Handlers.updateLemburConfig('${sbuEsc}','paguNonPO',this.value)"></td>
                   <td class="mono">${Utils.formatRupiah(r.paguPerUnit)}</td>
-                  <td><input type="number" min="0" class="form-control mono" style="min-width:130px" value="${r.cfg.bnlp || 0}" onchange="Handlers.updateLemburConfig('${sbuEsc}','bnlp',this.value)"></td>
+                  <td><input type="text" inputmode="numeric" class="form-control mono" style="min-width:130px" value="${Utils.formatRupiah(r.cfg.bnlp || 0)}" onchange="Handlers.updateLemburConfig('${sbuEsc}','bnlp',this.value)"></td>
                   <td class="mono">${Utils.formatRupiah(r.bnlpPerBulan)}</td>
                   <td class="mono">${Utils.formatRupiah(r.maxTopupPerBulan)}</td>
                   <td class="mono" style="text-align:center;">${r.jumlahKaryawanSPPD}</td>
@@ -3072,7 +3068,7 @@ const Handlers = {
   updateLemburConfig(sbu, field, value) {
     if (!AppState.lemburSbuConfig[sbu]) AppState.lemburSbuConfig[sbu] = { paguNonPO: 0, bnlp: 0 };
     const oldVal = AppState.lemburSbuConfig[sbu][field] || 0;
-    const newVal = Math.max(0, Number(value) || 0);
+    const newVal = Math.max(0, Utils.parseNominal(value)); // ✅ DIUBAH: parse format Rupiah ("Rp1.500.000")
     if (oldVal !== newVal) {
       const label = field === 'paguNonPO' ? 'PAGU Non PO' : 'BNLP';
       AppState.log.push(Models.LogChange(
@@ -3155,7 +3151,6 @@ const Handlers = {
 
     const summaryRows = [
       { 'Keterangan': 'Total Realisasi SPPD/Lembur', 'Nilai': totalRealisasi },
-      { 'Keterangan': 'Tiket Dibelikan HPI', 'Nilai': tiketHPI },
       { 'Keterangan': 'Man Fee (7%)', 'Nilai': manFee },
       { 'Keterangan': 'Grand Total', 'Nilai': grandTotal }
     ];
