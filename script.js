@@ -828,10 +828,13 @@ const EmployeeService = {
   },
 
   bulkUpload(dataArray) {
-    // ✅ BARU: tandai apakah ini upload pertama (belum ada karyawan sama sekali
-    // sebelum upload ini) — dipakai untuk menentukan apakah Slot Jabatan per SBU
-    // perlu dibangun otomatis dari data Excel ini.
-    const isFirstUpload = AppState.karyawan.length === 0;
+    // ✅ DIUBAH: Slot Fix sekarang dikunci permanen setelah pertama kali terbentuk.
+    // Sebelumnya dicek pakai "AppState.karyawan.length === 0", yang bisa salah terpicu ulang.
+    // Sekarang dicek dari slotConfig itu sendiri — begitu Slot Fix sudah ada isinya (sekali saja,
+    // kapan pun itu), upload Excel berikutnya TIDAK PERNAH lagi mengubah/membangun ulang Slot Fix,
+    // walau ada SBU/Jabatan baru yang belum tercatat. Perubahan Slot Fix setelah itu hanya lewat
+    // tombol "Edit Slot" manual.
+    const slotConfigSudahAda = Object.keys(AppState.slotConfig || {}).length > 0;
 
     const classified = this.classifyUploadRows(dataArray);
     const toInsert = classified.filter(r => r.__uploadStatus === 'new');
@@ -839,12 +842,8 @@ const EmployeeService = {
     const newEmployees = toInsert.map(data => Models.Karyawan(data));
     AppState.karyawan = AppState.karyawan.concat(newEmployees);
 
-    // ✅ BARU: Kalau ini upload pertama, bangun Slot Jabatan per SBU dari data
-    // yang baru saja diupload — bukan lagi dari CONFIG.SLOT_PER_SBU yang statis.
-    // Upload berikutnya (menambah karyawan baru ke data yang sudah ada) TIDAK
-    // menimpa slotConfig, supaya penyesuaian manual superadmin lewat "Edit Slot"
-    // tidak hilang begitu saja.
-    if (isFirstUpload && newEmployees.length > 0) {
+    // Hanya dibangun otomatis SEKALI, saat Slot Fix benar-benar belum pernah ada sama sekali.
+    if (!slotConfigSudahAda && newEmployees.length > 0) {
       AppState.slotConfig = this.buildSlotConfigFromData(newEmployees);
     }
 
@@ -854,7 +853,7 @@ const EmployeeService = {
       duplicateExisting: classified.filter(r => r.__uploadStatus === 'duplicate_existing').length,
       duplicateInFile: classified.filter(r => r.__uploadStatus === 'duplicate_infile').length,
       invalid: classified.filter(r => r.__uploadStatus === 'invalid').length,
-      slotConfigBuilt: isFirstUpload && newEmployees.length > 0 // ✅ BARU
+      slotConfigBuilt: !slotConfigSudahAda && newEmployees.length > 0 // ✅ DIUBAH
     };
 
     if (stats.total > 0) {
