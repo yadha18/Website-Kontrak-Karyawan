@@ -1663,7 +1663,7 @@ const UI = {
           <div class="card-title" style="margin:0;">💰 Ringkasan Realisasi</div>
           <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardNonPOExcel()">⬇ Export Excel</button>
         </div>
-        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="stat-grid cols-3">
           <div class="stat-card"><div class="stat-label">Total Realisasi SPPD/Lembur</div><div class="stat-value accent">${Utils.formatRupiah(totalRealisasi)}</div></div>
           <div class="stat-card"><div class="stat-label">Man Fee (7%)</div><div class="stat-value warning">${Utils.formatRupiah(manFee)}</div></div>
           <div class="stat-card"><div class="stat-label">Grand Total</div><div class="stat-value success">${Utils.formatRupiah(grandTotal)}</div></div>
@@ -1766,7 +1766,7 @@ const UI = {
           <div class="card-title" style="margin:0;">💻 Ringkasan Status Laptop</div>
           <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardLaptopExcel()">⬇ Export Excel</button>
         </div>
-        <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-grid cols-4">
           <div class="stat-card"><div class="stat-label">Total Laptop</div><div class="stat-value accent">${laptop.length}</div></div>
           <div class="stat-card"><div class="stat-label">🟢 Aktif</div><div class="stat-value success">${totalAktif}</div></div>
           <div class="stat-card"><div class="stat-label">🔴 Belum Dikembalikan</div><div class="stat-value danger">${totalBelum}</div></div>
@@ -1972,6 +1972,7 @@ const Handlers = {
     document.querySelectorAll('.nav-item').forEach(n => {
       if (n.getAttribute('onclick')?.includes("'" + page + "'")) n.classList.add('active');
     });
+    Handlers.closeSidebarOnMobile(); // ✅ RESPONSIVE: tutup drawer sidebar otomatis setelah pilih menu di HP/tablet
 
     // ✅ DIUBAH: Dashboard Non PO & Tabel Lembur digabung jadi 1 halaman per-bulan (page-lembur-bulan),
     // dipanggil lewat Handlers.navigateBulan() dari menu sidebar — tidak lagi lewat navigate() biasa.
@@ -2024,6 +2025,20 @@ const Handlers = {
     });
     document.getElementById('lemburBulanTitle').textContent = `📅 Data Lembur & SPPD — ${bulan}`;
     this.setLemburViewTab(AppState.lemburViewTab || 'dashboard');
+    this.closeSidebarOnMobile(); // ✅ RESPONSIVE: tutup drawer sidebar otomatis setelah pilih bulan di HP/tablet
+  },
+
+  // ✅ RESPONSIVE: buka/tutup sidebar sebagai drawer di tablet/HP (≤768px)
+  toggleSidebar(force) {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (!sidebar || !backdrop) return;
+    const shouldOpen = typeof force === 'boolean' ? force : !sidebar.classList.contains('open');
+    sidebar.classList.toggle('open', shouldOpen);
+    backdrop.classList.toggle('open', shouldOpen);
+  },
+  closeSidebarOnMobile() {
+    if (window.innerWidth <= 768) this.toggleSidebar(false);
   },
 
   // ✅ BARU: Ganti tab dalam halaman bulan Lembur & SPPD — 'dashboard' (Dashboard Non PO) atau 'tabel' (Tabel Data)
@@ -2134,7 +2149,7 @@ const Handlers = {
       const elStats = document.getElementById('previewStats');
       if (elStats) {
         elStats.innerHTML = `
-          <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;">
+          <div class="stat-grid cols-5" style="margin-bottom:16px;">
             <div class="stat-card"><div class="stat-label">✔ Data Baru (akan ditambahkan)</div><div class="stat-value success">${stats.new}</div></div>
             <div class="stat-card"><div class="stat-label">🔁 NIP Diperbarui (NIK cocok)</div><div class="stat-value accent">${stats.nipChanged}</div></div>
             <div class="stat-card"><div class="stat-label">🧩 NIP Sudah Ada (lengkapi kolom kosong)</div><div class="stat-value accent">${stats.duplicateExisting}</div></div>
@@ -2188,7 +2203,7 @@ const Handlers = {
     const elStats = document.getElementById('previewStats');
     if (elStats) {
       elStats.innerHTML = `
-        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
+        <div class="stat-grid cols-2" style="margin-bottom:16px;">
           <div class="stat-card"><div class="stat-label">✔ Data Valid (akan ditambahkan)</div><div class="stat-value success">${stats.valid}</div></div>
           <div class="stat-card"><div class="stat-label">✕ Tidak Valid (dilewati)</div><div class="stat-value danger">${stats.invalid}</div></div>
         </div>
@@ -2268,7 +2283,7 @@ const Handlers = {
     const elStats = document.getElementById('previewStats');
     if (elStats) {
       elStats.innerHTML = `
-        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
+        <div class="stat-grid cols-2" style="margin-bottom:16px;">
           <div class="stat-card"><div class="stat-label">✔ Data Valid (akan ditambahkan)</div><div class="stat-value success">${stats.valid}</div></div>
           <div class="stat-card"><div class="stat-label">✕ Tidak Valid (dilewati)</div><div class="stat-value danger">${stats.invalid}</div></div>
         </div>
@@ -3585,6 +3600,7 @@ window.openModalLaptop          = (id) => Handlers.openLaptopModal(id);      // 
 window.resetLaptopPageAndRender = () => Handlers.resetLaptopPageAndRender(); // ✅ BARU
 window.changeLaptopPageSize     = () => Handlers.changeLaptopPageSize();     // ✅ BARU
 window.exportLaptopExcel        = () => Handlers.exportLaptopExcel();        // ✅ BARU
+window.toggleSidebar            = (force) => Handlers.toggleSidebar(force);  // ✅ RESPONSIVE
 
 // Initialize application
 ThemeService.init();

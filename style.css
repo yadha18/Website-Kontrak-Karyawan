@@ -46,6 +46,16 @@ body, .card, .stat-card, .modal, .sidebar, .topbar, .nav-item, .btn, th, td,
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
 
 .topbar { display: flex; align-items: center; gap: 12px; padding: 0 28px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+
+/* ✅ RESPONSIVE: tombol hamburger — disembunyikan di desktop, tampil di tablet/HP */
+.hamburger-btn { display: none; flex-direction: column; justify-content: center; gap: 4px; width: 32px; height: 32px; flex-shrink: 0; border: none; background: none; cursor: pointer; padding: 4px; border-radius: 6px; }
+.hamburger-btn:hover { background: var(--surface2); }
+.hamburger-btn span { display: block; width: 100%; height: 2px; background: var(--text); border-radius: 2px; }
+
+/* ✅ RESPONSIVE: backdrop di belakang sidebar saat dibuka sebagai drawer di mobile */
+.sidebar-backdrop { display: none; position: fixed; inset: 56px 0 0 0; background: rgba(0,0,0,.5); z-index: 140; }
+.sidebar-backdrop.open { display: block; }
+
 .topbar-logo { font-weight: 700; font-size: 15px; letter-spacing: .04em; color: var(--accent2); }
 .topbar-logo span { color: var(--text2); font-weight: 400; }
 .topbar-sep { flex: 1; }
@@ -107,6 +117,11 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .card-title { font-size: 13px; font-weight: 600; color: var(--text2); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 24px; }
+/* ✅ RESPONSIVE: varian jumlah kolom stat-grid (dipakai lewat class, bukan inline style, supaya bisa dioverride di media query) */
+.stat-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.stat-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.stat-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.stat-grid.cols-5 { grid-template-columns: repeat(5, 1fr); }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
 .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; }
 .stat-value { font-size: 26px; font-weight: 700; font-family: var(--mono); }
@@ -365,4 +380,84 @@ select.form-control { cursor: pointer; }
   width: 80px;
   flex-shrink: 0;
   text-align: center;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ✅ RESPONSIVE: TABLET & SMARTPHONE
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── TABLET (≤1024px): sidebar sedikit lebih ramping, grid stat menyesuaikan ── */
+@media (max-width: 1024px) {
+  .sidebar { width: 190px; }
+  .content { padding: 20px; }
+  .stat-grid,
+  .stat-grid.cols-2, .stat-grid.cols-3, .stat-grid.cols-4, .stat-grid.cols-5 { grid-template-columns: repeat(3, 1fr); }
+  .modal { width: 92vw; }
+  .detail-info-grid { grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+}
+
+/* ── MOBILE / TABLET SEMPIT (≤768px): sidebar jadi drawer, layout ditumpuk ── */
+@media (max-width: 768px) {
+  .hamburger-btn { display: flex; }
+  .topbar { padding: 0 14px; gap: 8px; }
+  .topbar-logo { font-size: 13px; }
+  .badge-count { display: none !important; }
+
+  .layout { position: relative; height: calc(100vh - 56px); }
+
+  .sidebar {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    width: 78vw;
+    max-width: 280px;
+    z-index: 150;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.35);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .content { padding: 16px; width: 100%; }
+
+  .page-header h1 { font-size: 19px; }
+
+  .stat-grid,
+  .stat-grid.cols-2, .stat-grid.cols-3, .stat-grid.cols-4, .stat-grid.cols-5 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-card { padding: 12px 14px; }
+  .stat-value { font-size: 21px; }
+
+  .card { padding: 14px; }
+
+  .modal { width: 94vw; padding: 18px; border-radius: 12px; }
+  .modal-overlay { padding: 10px; }
+  .form-row { flex-direction: column; gap: 0; }
+
+  .detail-info-grid { grid-template-columns: 1fr; }
+
+  .search-bar { flex-direction: column; align-items: stretch; }
+  .search-bar input, .search-bar select { min-width: 0; width: 100%; }
+
+  .flex-between { flex-direction: column; align-items: stretch; gap: 10px; }
+
+  .pagination-container { flex-direction: column; align-items: stretch; text-align: center; }
+  .page-controls { justify-content: center; flex-wrap: wrap; }
+
+  .slot-accordion-header { flex-wrap: wrap; }
+  .slot-accordion-stats { width: 100%; order: 3; }
+
+  #toast { left: 12px; right: 12px; max-width: none; bottom: 16px; }
+}
+
+/* ── SMARTPHONE KECIL (≤480px) ── */
+@media (max-width: 480px) {
+  .stat-grid,
+  .stat-grid.cols-2, .stat-grid.cols-3, .stat-grid.cols-4, .stat-grid.cols-5 { grid-template-columns: repeat(1, 1fr); gap: 8px; }
+  .stat-value { font-size: 18px; }
+  .stat-label { font-size: 10px; }
+  .btn { padding: 7px 12px; font-size: 12.5px; }
+  .modal { padding: 14px; }
+  .nav-item { font-size: 13px; }
+  .upload-zone { padding: 28px 16px; }
 }

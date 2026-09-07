@@ -20,6 +20,9 @@
 <body>
 
 <div class="topbar">
+  <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" title="Menu" aria-label="Buka/tutup menu">
+    <span></span><span></span><span></span>
+  </button>
   <div class="topbar-logo">HRIS <span>/ Jabatan Karyawan</span></div>
   <div class="topbar-sep"></div>
   <span class="badge-count" id="changesBadge">0 perubahan</span>
@@ -31,7 +34,8 @@
 </div>
 
 <div class="layout">
-  <nav class="sidebar">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)"></div>
+  <nav class="sidebar" id="sidebar">
     <div class="nav-label">Menu</div>
     <button class="nav-item" onclick="navigate('upload')"><span class="icon">📂</span> Upload Data</button>
 
@@ -106,7 +110,7 @@
           <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
           <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
         </div>
-        <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-grid cols-4">
           <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
           <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
           <div class="stat-card"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-value"></div></div>
@@ -143,7 +147,7 @@
       </div>
 
       <!-- ✅ DIUBAH: Total Jabatan Tersedia kini sejajar dengan statistik slot fix/terisi/tersisa -->
-      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="stat-grid cols-4">
         <div class="stat-card"><div class="stat-label">📋 Total Jabatan Tersedia</div><div class="stat-value" id="stat-types">0</div></div>
         <div class="stat-card"><div class="stat-label">📌 Total Slot Fix</div><div class="stat-value purple" id="stat-slot-total">0</div></div>
         <div class="stat-card"><div class="stat-label">✅ Slot Terisi</div><div class="stat-value accent" id="stat-slot-terisi">0</div></div>
