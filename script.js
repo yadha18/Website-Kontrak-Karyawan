@@ -189,7 +189,7 @@ const AppState = {
   laptop: [],
   laptopPagination: { page: 1, size: 10 },
 
-  modals: { editTargetId: null, statusTargetId: null, statusListTarget: null, lemburEditId: null, laptopEditId: null, laptopDetailNIP: null, pendingBuktiBA: null, pendingBuktiBAFileName: null },
+  modals: { editTargetId: null, statusTargetId: null, statusListTarget: null, lemburEditId: null, laptopEditId: null, laptopDetailNIP: null, pendingBuktiBA: null, pendingBuktiBAFileName: null, pendingNipBaruIds: null },
   slotPanelOpen: {}, // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
   slotJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan, key = "SBU::Jabatan"
 
@@ -2643,6 +2643,7 @@ const Handlers = {
   // resmi mereka (mengganti NIP lama). NIP Baru dikosongkan setelah diterapkan. Data Lembur/SPPD &
   // Monitoring Laptop yang masih memakai NIP lama ikut disesuaikan otomatis — supaya tidak ada data
   // yang jadi yatim/duplikat, sama seperti mekanisme deteksi NIP berganti lewat NIK saat upload.
+  // ✅ DIUBAH: Cek NIP Baru sekarang pakai modal konfirmasi kustom, bukan window.confirm() bawaan browser.
   cekNipBaru() {
     const candidates = AppState.karyawan.filter(k => k.NIPBaru && k.NIPBaru.trim() && k.NIPBaru.trim() !== k.NIP);
     if (!candidates.length) return Utils.toast('ℹ️ Tidak ada karyawan dengan NIP Baru yang perlu diperbarui.');
@@ -2660,15 +2661,37 @@ const Handlers = {
       return Utils.toast(`⚠️ ${conflicts.length} data NIP Baru bentrok dengan NIP karyawan lain — tidak ada yang bisa diperbarui.`, 6000);
     }
 
-    const preview = applicable.slice(0, 5).map(k => `• ${k.Nama}: ${k.NIP} → ${k.NIPBaru.trim()}`).join('\n');
-    const more = applicable.length > 5 ? `\n... dan ${applicable.length - 5} lainnya` : '';
-    const confirmMsg = `Perbarui NIP untuk ${applicable.length} karyawan berikut?\n\n${preview}${more}` +
-      (conflicts.length ? `\n\n⚠️ ${conflicts.length} data dilewati karena NIP Baru-nya sudah dipakai karyawan lain.` : '');
-    if (!confirm(confirmMsg)) return;
+    // Simpan daftar id yang akan diproses supaya tombol konfirmasi di modal tinggal mengeksekusinya
+    AppState.modals.pendingNipBaruIds = applicable.map(k => k.id);
+
+    document.getElementById('cekNipBaruCount').textContent = applicable.length;
+    document.getElementById('cekNipBaruList').innerHTML = applicable.map(k => `
+      <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+        <span style="font-weight:500;">${k.Nama}</span>
+        <span class="mono" style="color:var(--text2);">${k.NIP} → <span style="color:var(--accent2);font-weight:600;">${k.NIPBaru.trim()}</span></span>
+      </div>`).join('');
+
+    const warnEl = document.getElementById('cekNipBaruConflictWarning');
+    if (conflicts.length > 0) {
+      warnEl.style.display = 'block';
+      warnEl.textContent = `⚠️ ${conflicts.length} data dilewati karena NIP Baru-nya sudah dipakai karyawan lain: ${conflicts.map(k => k.Nama).join(', ')}.`;
+    } else {
+      warnEl.style.display = 'none';
+    }
+
+    document.getElementById('modalCekNipBaru').classList.add('open');
+  },
+
+  // ✅ BARU: Eksekusi pembaruan NIP setelah dikonfirmasi lewat modal
+  confirmCekNipBaru() {
+    const ids = AppState.modals.pendingNipBaruIds || [];
+    const applicable = AppState.karyawan.filter(k => ids.includes(k.id));
+    if (!applicable.length) { closeModal('modalCekNipBaru'); return; }
 
     applicable.forEach(k => {
       const oldNIP = k.NIP;
       const newNIP = k.NIPBaru.trim();
+      if (!newNIP || oldNIP === newNIP) return;
       k.NIP = newNIP;
       k.NIPBaru = '';
       AppState.lembur.forEach(l => { if (l.NIP === oldNIP) l.NIP = newNIP; });
@@ -2680,9 +2703,11 @@ const Handlers = {
       ));
     });
 
+    AppState.modals.pendingNipBaruIds = null;
     DB.save();
+    closeModal('modalCekNipBaru');
     this.resetPageAndRender();
-    Utils.toast(`✅ ${applicable.length} NIP berhasil diperbarui.${conflicts.length ? ` ⚠ ${conflicts.length} dilewati (bentrok).` : ''}`, 6000);
+    Utils.toast(`✅ ${applicable.length} NIP berhasil diperbarui.`, 6000);
   },
 
   deleteKaryawan(id) {

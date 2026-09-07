@@ -813,6 +813,29 @@
   </div>
 </div>
 
+<!-- ✅ BARU: Modal Konfirmasi "Cek NIP Baru" -->
+<div class="modal-overlay" id="modalCekNipBaru">
+  <div class="modal" style="width: 560px;">
+    <div class="modal-header">
+      <h2>🔁 Konfirmasi Perbarui NIP</h2>
+      <button class="modal-close" onclick="closeModal('modalCekNipBaru')">✕</button>
+    </div>
+
+    <div class="info-note">
+      ℹ️ NIP untuk <strong id="cekNipBaruCount">0</strong> karyawan berikut akan diganti sesuai kolom "NIP Baru" masing-masing. Kolom NIP Baru akan dikosongkan setelah diterapkan, dan data Lembur/SPPD serta Monitoring Laptop yang memakai NIP lama ikut disesuaikan otomatis.
+    </div>
+
+    <div id="cekNipBaruList" style="max-height:320px;overflow-y:auto;margin-bottom:12px;"></div>
+
+    <div id="cekNipBaruConflictWarning" class="info-note" style="display:none;background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.25);color:var(--warning);"></div>
+
+    <div class="flex-end" style="margin-top:8px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalCekNipBaru')">Batal</button>
+      <button class="btn btn-primary" onclick="Handlers.confirmCekNipBaru()">✅ Ya, Perbarui NIP</button>
+    </div>
+  </div>
+</div>
+
 <!-- ✅ BARU: Modal Autentikasi Superadmin -->
 <div class="modal-overlay" id="modalSuperadminAuth">
   <div class="modal" style="width: 400px;">
