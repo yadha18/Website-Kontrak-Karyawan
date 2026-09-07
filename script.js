@@ -846,6 +846,31 @@ const EmployeeService = {
     return config;
   },
 
+  // ✅ BARU: Field yang boleh dilengkapi otomatis kalau NIP sudah ada tapi kolomnya masih kosong.
+  // Status/StatusCatatan/StatusManual sengaja TIDAK dimasukkan — perubahan status tetap harus lewat
+  // alur normal (upload baris baru / edit manual) supaya histori status tidak berubah diam-diam.
+  MERGEABLE_FIELDS: ['Nama','NIK','Grade','Jabatan','SBU','GajiPokok','HargaSatuan','PJTK','NoSP2K',
+    'NamaTL','SubBidang','BKOJabatan','BKOSBU','NIPBaru','Email','EmailKorporat','NamaAkunICRM',
+    'TglMasuk','TglKeluar','UkuranBaju','NoTelp'],
+
+  // ✅ BARU: Kalau NIP di file upload sudah terdaftar (duplicate_existing), JANGAN dilewati begitu saja —
+  // isi kolom yang di data lama masih kosong dengan value dari file (kolom yang sudah ada isinya tidak
+  // ditimpa). Mis. karyawan lama belum ada Gaji Pokok, file baru punya nilainya → otomatis terisi.
+  fillMissingFields(existingEmp, rawRow) {
+    const normalized = Models.Karyawan({ ...rawRow, id: existingEmp.id, NIP: existingEmp.NIP });
+    const isEmpty = v => v === '' || v === null || v === undefined || v === 0;
+    const changes = [];
+    this.MERGEABLE_FIELDS.forEach(field => {
+      const curVal = existingEmp[field];
+      const newVal = normalized[field];
+      if (isEmpty(curVal) && !isEmpty(newVal)) {
+        changes.push(`${field}: '${curVal || '-'}' → '${newVal}'`);
+        existingEmp[field] = newVal;
+      }
+    });
+    return changes;
+  },
+
   bulkUpload(dataArray) {
     // ✅ DIUBAH: Slot Fix sekarang dikunci permanen setelah pertama kali terbentuk.
     // Sebelumnya dicek pakai "AppState.karyawan.length === 0", yang bisa salah terpicu ulang.
@@ -886,6 +911,26 @@ const EmployeeService = {
       nipMigrated++;
     });
 
+    // ✅ BARU: NIP sudah terdaftar TAPI ada kolom kosong yang bisa dilengkapi dari file ini —
+    // jangan dilewati, isi saja kolom yang masih kosong (kolom yang sudah terisi tidak ditimpa).
+    const toFillDuplicates = classified.filter(r => r.__uploadStatus === 'duplicate_existing');
+    let filledCount = 0;
+    toFillDuplicates.forEach(row => {
+      const nip = String(row.NIP || '').trim();
+      const emp = AppState.karyawan.find(k => k.NIP === nip);
+      if (!emp) return;
+      const changes = this.fillMissingFields(emp, row);
+      if (changes.length > 0) {
+        filledCount++;
+        emp.TglUpdate = Utils.getTodayDate();
+        AppState.log.push(Models.LogChange(
+          nip, emp.Nama, 'lengkapi data',
+          '-', changes.join(', '),
+          'Kolom kosong dilengkapi otomatis dari upload (NIP sudah terdaftar)'
+        ));
+      }
+    });
+
     // Hanya dibangun otomatis SEKALI, saat Slot Fix benar-benar belum pernah ada sama sekali.
     if (!slotConfigSudahAda && newEmployees.length > 0) {
       AppState.slotConfig = this.buildSlotConfigFromData(newEmployees);
@@ -895,6 +940,7 @@ const EmployeeService = {
       total: classified.length,
       added: toInsert.length,
       nipMigrated, // ✅ BARU
+      filledCount, // ✅ BARU
       duplicateExisting: classified.filter(r => r.__uploadStatus === 'duplicate_existing').length,
       duplicateInFile: classified.filter(r => r.__uploadStatus === 'duplicate_infile').length,
       invalid: classified.filter(r => r.__uploadStatus === 'invalid').length,
@@ -905,7 +951,7 @@ const EmployeeService = {
       AppState.log.push(Models.LogChange(
         'SYSTEM', 'SYSTEM', 'upload',
         `${stats.total} baris diproses`,
-        `${stats.added} baru ditambahkan, ${stats.nipMigrated} NIP diperbarui (NIK cocok), ${stats.duplicateExisting + stats.duplicateInFile} duplikat NIP dilewati, ${stats.invalid} NIP kosong dilewati`
+        `${stats.added} baru ditambahkan, ${stats.nipMigrated} NIP diperbarui (NIK cocok), ${stats.filledCount} data dilengkapi (NIP sudah ada), ${stats.duplicateInFile} duplikat di dalam file dilewati, ${stats.invalid} NIP kosong dilewati`
       ));
     }
 
@@ -2072,12 +2118,12 @@ const Handlers = {
       const statusBadge = {
         new:               '<span class="pill pill-green">✔ Baru</span>',
         nip_changed:       '<span class="pill pill-blue">🔁 NIP Diperbarui (NIK cocok)</span>',
-        duplicate_existing:'<span class="pill pill-yellow">⚠ NIP Sudah Ada</span>',
+        duplicate_existing:'<span class="pill pill-blue">🧩 NIP Sudah Ada (lengkapi kolom kosong)</span>',
         duplicate_infile:  '<span class="pill pill-yellow">⚠ Duplikat di File</span>',
         invalid:           '<span class="pill pill-red">✕ NIP Kosong</span>'
       };
       const rowClass = {
-        new: '', nip_changed: '', duplicate_existing: 'style="opacity:0.55"', duplicate_infile: 'style="opacity:0.55"', invalid: 'style="opacity:0.4"'
+        new: '', nip_changed: '', duplicate_existing: '', duplicate_infile: 'style="opacity:0.55"', invalid: 'style="opacity:0.4"'
       };
 
       // ✅ BARU: Ringkasan statistik sebelum konfirmasi
@@ -2095,11 +2141,11 @@ const Handlers = {
           <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;">
             <div class="stat-card"><div class="stat-label">✔ Data Baru (akan ditambahkan)</div><div class="stat-value success">${stats.new}</div></div>
             <div class="stat-card"><div class="stat-label">🔁 NIP Diperbarui (NIK cocok)</div><div class="stat-value accent">${stats.nipChanged}</div></div>
-            <div class="stat-card"><div class="stat-label">⚠ NIP Sudah Ada di Sistem</div><div class="stat-value warning">${stats.duplicateExisting}</div></div>
+            <div class="stat-card"><div class="stat-label">🧩 NIP Sudah Ada (lengkapi kolom kosong)</div><div class="stat-value accent">${stats.duplicateExisting}</div></div>
             <div class="stat-card"><div class="stat-label">⚠ Duplikat di Dalam File</div><div class="stat-value warning">${stats.duplicateInFile}</div></div>
             <div class="stat-card"><div class="stat-label">✕ NIP Kosong (tidak valid)</div><div class="stat-value danger">${stats.invalid}</div></div>
           </div>
-          <div class="info-note">ℹ️ NIP diperlakukan sebagai <strong>Primary Key</strong>. Baris <strong>Baru</strong> ditambahkan sebagai karyawan baru. Baris <strong>🔁 NIP Diperbarui</strong> (NIK-nya cocok dengan karyawan yang sudah ada, tapi NIP-nya beda) akan MENGGANTI NIP lama ke NIP baru pada karyawan yang sama — bukan menambah data baru — dan data Lembur/SPPD serta Monitoring Laptop miliknya ikut disesuaikan otomatis, supaya tidak ada data ganda.</div>`;
+          <div class="info-note">ℹ️ NIP diperlakukan sebagai <strong>Primary Key</strong>. Baris <strong>Baru</strong> ditambahkan sebagai karyawan baru. Baris <strong>🔁 NIP Diperbarui</strong> (NIK-nya cocok dengan karyawan yang sudah ada, tapi NIP-nya beda) akan MENGGANTI NIP lama ke NIP baru pada karyawan yang sama, dan data Lembur/SPPD serta Monitoring Laptop miliknya ikut disesuaikan otomatis. Baris <strong>🧩 NIP Sudah Ada</strong> TIDAK menambah data baru maupun menimpa data yang sudah terisi — hanya kolom yang di data lama masih KOSONG yang akan diisi dari file ini.</div>`;
       }
 
       document.getElementById('previewHead').innerHTML = '<th>Status</th>' + COLS.map(c => `<th>${c}</th>`).join('');
@@ -2296,17 +2342,21 @@ const Handlers = {
     const stats = EmployeeService.bulkUpload(mapped);
     this.cancelUpload();
 
-    const skippedTotal = stats.duplicateExisting + stats.duplicateInFile + stats.invalid;
+    // ✅ DIUBAH: duplicateExisting sekarang tidak lagi "dilewati" — kolom kosongnya dilengkapi (lihat filledCount)
+    const skippedTotal = stats.duplicateInFile + stats.invalid;
     const slotNote = stats.slotConfigBuilt
       ? ' 📊 Slot Jabatan per SBU otomatis dibangun mengikuti jumlah karyawan di file ini (bisa disesuaikan lewat Edit Slot).'
       : '';
     const migrateNote = stats.nipMigrated > 0
       ? ` 🔁 ${stats.nipMigrated} NIP diperbarui (NIK cocok, data lama disambungkan ke NIP baru).`
       : '';
+    const fillNote = stats.filledCount > 0
+      ? ` 🧩 ${stats.filledCount} karyawan dilengkapi kolom kosongnya dari file ini.`
+      : '';
     if (skippedTotal > 0) {
-      Utils.toast(`✅ ${stats.added} data baru ditambahkan.${migrateNote} ⚠ ${skippedTotal} baris dilewati (duplikat/tidak valid).${slotNote}`, 6000);
+      Utils.toast(`✅ ${stats.added} data baru ditambahkan.${migrateNote}${fillNote} ⚠ ${skippedTotal} baris dilewati (duplikat di file/tidak valid).${slotNote}`, 6500);
     } else {
-      Utils.toast(`✅ ${stats.added} karyawan baru berhasil disimpan.${migrateNote}${slotNote}`, (stats.slotConfigBuilt || stats.nipMigrated > 0) ? 6000 : 3000);
+      Utils.toast(`✅ ${stats.added} karyawan baru berhasil disimpan.${migrateNote}${fillNote}${slotNote}`, (stats.slotConfigBuilt || stats.nipMigrated > 0 || stats.filledCount > 0) ? 6500 : 3000);
     }
     this.resetPageAndRender();
     this.navigate('dashboard');
@@ -2589,6 +2639,52 @@ const Handlers = {
   },
 
   // ✅ BARU: Hapus karyawan dengan modal konfirmasi kustom
+  // ✅ BARU: Cek semua karyawan yang kolom "NIP Baru"-nya terisi, lalu terapkan NIP baru itu ke NIP
+  // resmi mereka (mengganti NIP lama). NIP Baru dikosongkan setelah diterapkan. Data Lembur/SPPD &
+  // Monitoring Laptop yang masih memakai NIP lama ikut disesuaikan otomatis — supaya tidak ada data
+  // yang jadi yatim/duplikat, sama seperti mekanisme deteksi NIP berganti lewat NIK saat upload.
+  cekNipBaru() {
+    const candidates = AppState.karyawan.filter(k => k.NIPBaru && k.NIPBaru.trim() && k.NIPBaru.trim() !== k.NIP);
+    if (!candidates.length) return Utils.toast('ℹ️ Tidak ada karyawan dengan NIP Baru yang perlu diperbarui.');
+
+    // Cek konflik: NIP Baru yang ternyata sudah dipakai karyawan lain
+    const conflicts = [];
+    const applicable = [];
+    candidates.forEach(k => {
+      const newNip = k.NIPBaru.trim();
+      const clash = AppState.karyawan.find(other => other.id !== k.id && other.NIP === newNip);
+      if (clash) conflicts.push(k); else applicable.push(k);
+    });
+
+    if (!applicable.length) {
+      return Utils.toast(`⚠️ ${conflicts.length} data NIP Baru bentrok dengan NIP karyawan lain — tidak ada yang bisa diperbarui.`, 6000);
+    }
+
+    const preview = applicable.slice(0, 5).map(k => `• ${k.Nama}: ${k.NIP} → ${k.NIPBaru.trim()}`).join('\n');
+    const more = applicable.length > 5 ? `\n... dan ${applicable.length - 5} lainnya` : '';
+    const confirmMsg = `Perbarui NIP untuk ${applicable.length} karyawan berikut?\n\n${preview}${more}` +
+      (conflicts.length ? `\n\n⚠️ ${conflicts.length} data dilewati karena NIP Baru-nya sudah dipakai karyawan lain.` : '');
+    if (!confirm(confirmMsg)) return;
+
+    applicable.forEach(k => {
+      const oldNIP = k.NIP;
+      const newNIP = k.NIPBaru.trim();
+      k.NIP = newNIP;
+      k.NIPBaru = '';
+      AppState.lembur.forEach(l => { if (l.NIP === oldNIP) l.NIP = newNIP; });
+      AppState.laptop.forEach(l => { if (l.NIP === oldNIP) l.NIP = newNIP; });
+      AppState.log.push(Models.LogChange(
+        newNIP, k.Nama, 'nip diperbarui',
+        oldNIP, newNIP,
+        'NIP diperbarui manual lewat tombol "Cek NIP Baru" — data Lembur/SPPD & Laptop ikut disesuaikan'
+      ));
+    });
+
+    DB.save();
+    this.resetPageAndRender();
+    Utils.toast(`✅ ${applicable.length} NIP berhasil diperbarui.${conflicts.length ? ` ⚠ ${conflicts.length} dilewati (bentrok).` : ''}`, 6000);
+  },
+
   deleteKaryawan(id) {
     const emp = AppState.karyawan.find(k => k.id === id);
     if (!emp) return;
