@@ -168,6 +168,7 @@ const STATUS_DEF = {
 const AppState = {
   karyawan: [],
   jabatan: [],
+  subBidang: [], // ✅ BARU: daftar Sub Bidang untuk dropdown Data Karyawan
   log: [],
   previewUpload: [],
   slotConfig: {}, // ✅ DIUBAH: dibangun otomatis dari Excel yang diupload pertama kali, bisa diedit & disimpan
@@ -209,6 +210,12 @@ const Models = {
       Grade:         String(data.Grade || '').trim().toUpperCase(),          // ✅ BARU
       Jabatan:       Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       SBU:           Utils.resolveSBU(String(data.SBU || '').trim()),
+      GajiPokok:     Utils.parseNominal(data.GajiPokok),       // ✅ BARU
+      HargaSatuan:   Utils.parseNominal(data.HargaSatuan),     // ✅ BARU
+      PJTK:          String(data.PJTK || '').trim(),           // ✅ BARU
+      NoSP2K:        String(data.NoSP2K || '').trim(),         // ✅ BARU
+      NamaTL:        String(data.NamaTL || '').trim(),         // ✅ BARU
+      SubBidang:     String(data.SubBidang || '').trim(),      // ✅ BARU
       BKOJabatan:    Utils.resolveJabatan(String(data.BKOJabatan || '').trim()),
       BKOSBU:        Utils.resolveSBU(String(data.BKOSBU || '').trim()),
       NIPBaru:       String(data.NIPBaru || '').trim(),
@@ -609,6 +616,7 @@ const DB = {
       AppState.jabatan     = Array.isArray(data.jabatan) && data.jabatan.length
         ? data.jabatan
         : CONFIG.DEFAULT_JABATAN.map(nama => ({ nama }));
+      AppState.subBidang  = Array.isArray(data.subBidang) ? data.subBidang : []; // ✅ BARU
       // ✅ DIUBAH: tidak lagi fallback ke CONFIG.SLOT_PER_SBU yang statis.
       // Kalau belum ada slotConfig tersimpan, biarkan kosong — akan otomatis
       // dibangun dari data Excel pertama kali yang diupload (lihat bulkUpload()).
@@ -647,6 +655,7 @@ const DB = {
       AppState.karyawan = AppState.karyawan || [];
       AppState.log = AppState.log || [];
       AppState.jabatan = AppState.jabatan && AppState.jabatan.length ? AppState.jabatan : CONFIG.DEFAULT_JABATAN.map(nama => ({ nama }));
+      AppState.subBidang = AppState.subBidang || []; // ✅ BARU
       AppState.slotConfig = AppState.slotConfig && Object.keys(AppState.slotConfig).length ? AppState.slotConfig : {};
       AppState.lembur = AppState.lembur || [];
       AppState.lemburSbuConfig = AppState.lemburSbuConfig || {};
@@ -675,7 +684,8 @@ const DB = {
           lembur: AppState.lembur,
           lemburSbuConfig: AppState.lemburSbuConfig,
           tiketHPI: AppState.tiketHPI,
-          laptop: AppState.laptop
+          laptop: AppState.laptop,
+          subBidang: AppState.subBidang
         })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1448,6 +1458,12 @@ const UI = {
         <td class="mono">${k.NIK || '—'}</td>
         <td>${k.Grade ? `<span class="pill pill-purple">${k.Grade}</span>` : '—'}</td>
         <td><span class="pill pill-blue">${k.Jabatan}</span></td><td>${k.SBU}</td>
+        <td class="mono">${Utils.formatRupiah(k.GajiPokok)}</td>
+        <td class="mono">${Utils.formatRupiah(k.HargaSatuan)}</td>
+        <td>${k.PJTK || '—'}</td>
+        <td class="mono">${k.NoSP2K || '—'}</td>
+        <td>${k.NamaTL || '—'}</td>
+        <td>${k.SubBidang ? `<span class="pill pill-gray">${k.SubBidang}</span>` : '—'}</td>
         <td>${k.BKOJabatan}</td><td>${k.BKOSBU}</td>
         <td class="mono">${k.NIPBaru}</td>
         <td>${k.Email || '—'}</td>
@@ -1870,6 +1886,22 @@ const UI = {
         <div class="jabatan-item-name">${j.nama}</div>
         <button class="btn btn-danger btn-sm" onclick="Handlers.deleteJabatan(${i})">Hapus</button>
       </div>`).join('');
+    this.renderSubBidangList(); // ✅ BARU: render bareng saat halaman "Daftar Jabatan" dibuka
+  },
+
+  // ✅ BARU: Render Daftar Sub Bidang (dropdown Data Karyawan)
+  renderSubBidangList() {
+    const list = document.getElementById('subBidangListDiv');
+    if (!list) return;
+    if (!AppState.subBidang.length) {
+      list.innerHTML = `<div class="empty"><h3>Belum ada daftar Sub Bidang</h3><p>Tambahkan lewat form di atas.</p></div>`;
+      return;
+    }
+    list.innerHTML = AppState.subBidang.map((s, i) => `
+      <div class="jabatan-item">
+        <div class="jabatan-item-name">${s.nama}</div>
+        <button class="btn btn-danger btn-sm" onclick="Handlers.deleteSubBidang(${i})">Hapus</button>
+      </div>`).join('');
   },
 
   setupUploadZone() {
@@ -1982,7 +2014,8 @@ const Handlers = {
     const desc = document.getElementById('uploadTypeDesc');
     if (desc) {
       if (AppState.uploadDataType === 'karyawan') {
-        desc.innerHTML = `Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.<br>
+        desc.innerHTML = `Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, Gaji Pokok, Harga Satuan, PJTK, No. SP2K, Nama TL, Sub Bidang, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.<br>
+           💡 <strong>Sub Bidang</strong> akan tetap tersimpan meski belum ada di Daftar Sub Bidang — tambahkan lewat menu "Daftar Jabatan" agar muncul di dropdown.<br>
            🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> NIP yang sudah terdaftar akan otomatis dilewati.`;
       } else if (AppState.uploadDataType === 'lembur') {
         desc.innerHTML = `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (Bulan: "Januari"–"Desember" ${CONFIG.TAHUN_LEMBUR_LIST.join('/')}; Tagihan: "SPPD 1 2" atau "Lembur").<br>
@@ -2021,7 +2054,7 @@ const Handlers = {
       if (AppState.uploadDataType === 'lembur') return this.processExcelLembur(raw);
       if (AppState.uploadDataType === 'laptop') return this.processExcelLaptop(raw);
 
-      const COLS = ['NIP','Nama','NIK','Grade','Jabatan','SBU','BKO Jabatan','BKO SBU','NIP Baru',
+      const COLS = ['NIP','Nama','NIK','Grade','Jabatan','SBU','Gaji Pokok','Harga Satuan','PJTK','No. SP2K','Nama TL','Sub Bidang','BKO Jabatan','BKO SBU','NIP Baru',
         'Email','Email Korporat','Nama Akun ICRM','Tanggal Masuk','Tanggal Keluar','Ukuran Baju','Nomor Telpon','Status','Catatan Status'];
       const header = raw[0].map(h => String(h).trim());
 
@@ -2249,6 +2282,8 @@ const Handlers = {
     const mapped = AppState.previewUpload.map(r => ({
       NIP: r['NIP'], Nama: r['Nama'], NIK: r['NIK'], Grade: r['Grade'],
       Jabatan: r['Jabatan'], SBU: r['SBU'],
+      GajiPokok: r['Gaji Pokok'], HargaSatuan: r['Harga Satuan'], // ✅ BARU
+      PJTK: r['PJTK'], NoSP2K: r['No. SP2K'], NamaTL: r['Nama TL'], SubBidang: r['Sub Bidang'], // ✅ BARU
       BKOJabatan: r['BKO Jabatan'], BKOSBU: r['BKO SBU'],
       NIPBaru: r['NIP Baru'],
       Email: r['Email'], EmailKorporat: r['Email Korporat'],
@@ -2318,6 +2353,12 @@ const Handlers = {
           ${infoItem('Grade', emp.Grade ? `<span class="pill pill-purple">${emp.Grade}</span>` : '—')}
           ${infoItem('Jabatan Saat Ini', `<span class="pill pill-blue">${emp.Jabatan}</span>`)}
           ${infoItem('SBU', emp.SBU)}
+          ${infoItem('Gaji Pokok', Utils.formatRupiah(emp.GajiPokok))}
+          ${infoItem('Harga Satuan', Utils.formatRupiah(emp.HargaSatuan))}
+          ${infoItem('PJTK', emp.PJTK)}
+          ${infoItem('No. SP2K', emp.NoSP2K)}
+          ${infoItem('Nama TL', emp.NamaTL)}
+          ${infoItem('Sub Bidang', emp.SubBidang ? `<span class="pill pill-gray">${emp.SubBidang}</span>` : '—')}
           ${infoItem('BKO Jabatan', emp.BKOJabatan)}
           ${infoItem('BKO SBU', emp.BKOSBU)}
           ${infoItem('Email', emp.Email)}
@@ -2404,6 +2445,13 @@ const Handlers = {
         CONFIG.UKURAN_BAJU.map(u => `<option value="${u}">${u}</option>`).join('');
     }
 
+    // ✅ Sub Bidang dropdown
+    const elSubBidang = document.getElementById('editSubBidang');
+    if (elSubBidang) {
+      elSubBidang.innerHTML = '<option value="">— Pilih Sub Bidang —</option>' +
+        AppState.subBidang.map(s => `<option value="${s.nama}">${s.nama}</option>`).join('');
+    }
+
     const emp = id ? AppState.karyawan.find(k => k.id === id) : Models.Karyawan();
 
     // Populate field values
@@ -2413,6 +2461,12 @@ const Handlers = {
     document.getElementById('editGrade').value        = emp.Grade || '';                       // ✅ BARU
     document.getElementById('editJabatan').value      = emp.Jabatan;
     document.getElementById('editSBU').value          = emp.SBU;
+    document.getElementById('editGajiPokok').value    = emp.GajiPokok || '';                   // ✅ BARU
+    document.getElementById('editHargaSatuan').value  = emp.HargaSatuan || '';                 // ✅ BARU
+    document.getElementById('editPJTK').value         = emp.PJTK || '';                        // ✅ BARU
+    document.getElementById('editNoSP2K').value       = emp.NoSP2K || '';                      // ✅ BARU
+    document.getElementById('editNamaTL').value       = emp.NamaTL || '';                      // ✅ BARU
+    document.getElementById('editSubBidang').value    = emp.SubBidang || '';                   // ✅ BARU
     document.getElementById('editBKOJabatan').value   = emp.BKOJabatan; // ✅ set value dropdown
     document.getElementById('editBKOSBU').value       = emp.BKOSBU;     // ✅ set value dropdown
     document.getElementById('editNIPBaru').value      = emp.NIPBaru;
@@ -2456,6 +2510,12 @@ const Handlers = {
       Grade:         document.getElementById('editGrade').value,             // ✅ BARU
       Jabatan:       JabatanValue,
       SBU:           document.getElementById('editSBU').value,
+      GajiPokok:     document.getElementById('editGajiPokok').value,          // ✅ BARU
+      HargaSatuan:   document.getElementById('editHargaSatuan').value,        // ✅ BARU
+      PJTK:          document.getElementById('editPJTK').value,               // ✅ BARU
+      NoSP2K:        document.getElementById('editNoSP2K').value,             // ✅ BARU
+      NamaTL:        document.getElementById('editNamaTL').value,             // ✅ BARU
+      SubBidang:     document.getElementById('editSubBidang').value,          // ✅ BARU
       BKOJabatan:    BKOJabatanValue,
       BKOSBU:        document.getElementById('editBKOSBU').value.toUpperCase(),     // ✅ uppercase
       NIPBaru:       document.getElementById('editNIPBaru').value,
@@ -3294,6 +3354,26 @@ const Handlers = {
     Utils.toast('🗑 Jabatan dihapus');
   },
 
+  // ✅ BARU: Tambah/Hapus Sub Bidang (dropdown Data Karyawan)
+  addSubBidang() {
+    const nama = document.getElementById('inputSubBidangNama').value.trim().toUpperCase();
+    if (!nama) return Utils.toast('❌ Nama Sub Bidang wajib diisi!');
+    if (AppState.subBidang.find(s => s.nama === nama)) return Utils.toast('❌ Sub Bidang sudah ada!');
+
+    AppState.subBidang.push({ nama });
+    DB.save();
+    document.getElementById('inputSubBidangNama').value = '';
+    UI.renderSubBidangList();
+    Utils.toast('✅ Sub Bidang ditambahkan');
+  },
+  deleteSubBidang(index) {
+    if (!confirm(`Hapus Sub Bidang "${AppState.subBidang[index].nama}"?`)) return;
+    AppState.subBidang.splice(index, 1);
+    DB.save();
+    UI.renderSubBidangList();
+    Utils.toast('🗑 Sub Bidang dihapus');
+  },
+
   // ✅ DIUBAH: exportToExcel kini menerima data opsional (default semua karyawan) untuk dipakai ulang oleh export terfilter
   exportToExcel(data = null, labelSuffix = '') {
     const sourceData = data || AppState.karyawan;
@@ -3301,6 +3381,8 @@ const Handlers = {
 
     const rows = sourceData.map(k => ({
       'NIP': k.NIP, 'Nama': k.Nama, 'NIK': k.NIK, 'Grade': k.Grade, 'Jabatan': k.Jabatan, 'SBU': k.SBU,
+      'Gaji Pokok': k.GajiPokok, 'Harga Satuan': k.HargaSatuan, 'PJTK': k.PJTK, 'No. SP2K': k.NoSP2K,
+      'Nama TL': k.NamaTL, 'Sub Bidang': k.SubBidang,
       'BKO Jabatan': k.BKOJabatan, 'BKO SBU': k.BKOSBU, 'NIP Baru': k.NIPBaru,
       'Email': k.Email, 'Email Korporat': k.EmailKorporat, 'Nama Akun ICRM': k.NamaAkunICRM,
       'Tanggal Masuk': k.TglMasuk, 'Tanggal Keluar': k.TglKeluar,

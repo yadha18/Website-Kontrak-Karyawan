@@ -293,7 +293,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>NIK</th><th>Grade</th><th>Jabatan</th><th>SBU</th><th>BKO Jabatan</th><th>BKO SBU</th><th>NIP Baru</th><th>Email Pribadi</th><th>Email Korporat</th><th>Nama Akun ICRM</th><th>No. Telp</th><th>Ukuran Baju</th><th>Tgl Masuk</th><th>Tgl Keluar</th><th>Tgl Update</th><th>Status</th></tr>
+            <tr><th>Aksi</th><th>NIP</th><th>Nama</th><th>NIK</th><th>Grade</th><th>Jabatan</th><th>SBU</th><th>Gaji Pokok</th><th>Harga Satuan</th><th>PJTK</th><th>No. SP2K</th><th>Nama TL</th><th>Sub Bidang</th><th>BKO Jabatan</th><th>BKO SBU</th><th>NIP Baru</th><th>Email Pribadi</th><th>Email Korporat</th><th>Nama Akun ICRM</th><th>No. Telp</th><th>Ukuran Baju</th><th>Tgl Masuk</th><th>Tgl Keluar</th><th>Tgl Update</th><th>Status</th></tr>
           </thead>
           <tbody id="karyawanBody"></tbody>
         </table>
@@ -480,6 +480,21 @@
         <div class="card-title">📋 Daftar Jabatan Default</div>
         <div id="jabatanListDiv"></div>
       </div>
+      <!-- ✅ BARU: Kelola Daftar Sub Bidang untuk dropdown Data Karyawan -->
+      <div class="card">
+        <div class="card-title">➕ Tambah Sub Bidang</div>
+        <div class="form-row" style="grid-template-columns: 1fr;">
+          <div class="form-group">
+            <label class="form-label">Nama Sub Bidang</label>
+            <input type="text" class="form-control" id="inputSubBidangNama" placeholder="cth: OPERASIONAL...">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="Handlers.addSubBidang()">Simpan Sub Bidang</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Daftar Sub Bidang</div>
+        <div id="subBidangListDiv"></div>
+      </div>
     </div>
 
   </main>
@@ -531,6 +546,38 @@
       <div class="form-group">
         <label class="form-label">SBU</label>
         <select class="form-control" id="editSBU"></select>
+      </div>
+    </div>
+
+    <!-- ✅ BARU: Gaji Pokok, Harga Satuan, PJTK, No. SP2K, Nama TL, Sub Bidang (ditempatkan setelah SBU) -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Gaji Pokok</label>
+        <input type="number" min="0" class="form-control" id="editGajiPokok" placeholder="cth: 5000000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Harga Satuan</label>
+        <input type="number" min="0" class="form-control" id="editHargaSatuan" placeholder="cth: 150000">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">PJTK</label>
+        <input type="text" class="form-control" id="editPJTK" placeholder="cth: PT ABC">
+      </div>
+      <div class="form-group">
+        <label class="form-label">No. SP2K</label>
+        <input type="text" class="form-control" id="editNoSP2K" placeholder="cth: SP2K-2026-001">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nama TL (Team Leader)</label>
+        <input type="text" class="form-control" id="editNamaTL" placeholder="Nama Team Leader">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sub Bidang</label>
+        <select class="form-control" id="editSubBidang"><option value="">— Pilih Sub Bidang —</option></select>
       </div>
     </div>
 

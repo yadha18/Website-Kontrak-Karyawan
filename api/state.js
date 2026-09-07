@@ -9,7 +9,7 @@
  */
 const { getStateCollection } = require('./_db');
 
-const DEFAULT_STATE = { karyawan: [], jabatan: [], log: [], slotConfig: {}, lembur: [], lemburSbuConfig: {}, tiketHPI: 0, laptop: [] };
+const DEFAULT_STATE = { karyawan: [], jabatan: [], log: [], slotConfig: {}, lembur: [], lemburSbuConfig: {}, tiketHPI: 0, laptop: [], subBidang: [] };
 
 // Guard opsional: kalau env API_KEY diisi, wajib kirim header x-api-key yang sama.
 function checkApiKey(req, res) {
@@ -38,7 +38,8 @@ module.exports = async function handler(req, res) {
       // Vercel otomatis mem-parse JSON body ke req.body saat Content-Type: application/json
       // ✅ BARU: lembur, lemburSbuConfig, tiketHPI — data Lembur & SPPD Karyawan + config Dashboard Non PO
       // ✅ BARU: laptop — data Monitoring Pengadaan Laptop
-      const { karyawan, jabatan, log, slotConfig, lembur, lemburSbuConfig, tiketHPI, laptop } = req.body || {};
+      // ✅ BARU: subBidang — daftar Sub Bidang untuk dropdown Data Karyawan
+      const { karyawan, jabatan, log, slotConfig, lembur, lemburSbuConfig, tiketHPI, laptop, subBidang } = req.body || {};
 
       if (!Array.isArray(karyawan) || !Array.isArray(jabatan) || !Array.isArray(log)) {
         return res.status(400).json({ error: 'invalid_payload', message: 'karyawan, jabatan, dan log harus berupa array.' });
@@ -52,6 +53,7 @@ module.exports = async function handler(req, res) {
             lemburSbuConfig: lemburSbuConfig || {},
             tiketHPI: Number(tiketHPI) || 0,
             laptop: Array.isArray(laptop) ? laptop : [],
+            subBidang: Array.isArray(subBidang) ? subBidang : [],
             updatedAt: new Date()
           } },
         { upsert: true }
