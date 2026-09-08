@@ -227,7 +227,7 @@ const Models = {
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
       NIK:           String(data.NIK || '').trim(),                          // ✅ BARU
-      Grade:         String(data.Grade || '').trim().toUpperCase(),          // ✅ BARU
+      Grade:         Utils.resolveGrade(String(data.Grade || '').trim()),      // ✅ DIUBAH: konsisten dengan opsi dropdown Grade
       Jabatan:       Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       SBU:           Utils.resolveSBU(String(data.SBU || '').trim()),
       GajiPokok:     Utils.parseNominal(data.GajiPokok),       // ✅ BARU
@@ -448,6 +448,29 @@ const Utils = {
         if (upper === alias) return entry.canonical;
       }
     }
+
+    // 3. Tidak cocok — kembalikan nilai asli (uppercase)
+    return upper;
+  },
+
+  // ✅ BARU: Resolve nilai Grade karyawan ke salah satu opsi resmi di CONFIG.DEFAULT_GRADE.
+  // Menoleransi variasi penulisan spasi/tanda hubung/underscore (mis. "Officer Grade 1",
+  // "OFFICER_GRADE_1" dianggap sama dengan "OFFICER GRADE-1"). Kalau tidak ada yang cocok
+  // sama sekali, nilai asli (uppercase) tetap dikembalikan supaya data lama tidak hilang —
+  // tinggal dipilih manual dari dropdown untuk dikoreksi.
+  resolveGrade(raw) {
+    if (!raw) return raw;
+    const upper = String(raw).trim().toUpperCase();
+
+    // 1. Exact match ke daftar Grade resmi — langsung kembalikan
+    const exactCanonical = CONFIG.DEFAULT_GRADE.find(g => g === upper);
+    if (exactCanonical) return exactCanonical;
+
+    // 2. Cocokkan setelah menghilangkan spasi/tanda hubung/underscore
+    const normalize = s => s.replace(/[^A-Z0-9]/g, '');
+    const inputKey = normalize(upper);
+    const looseMatch = CONFIG.DEFAULT_GRADE.find(g => normalize(g) === inputKey);
+    if (looseMatch) return looseMatch;
 
     // 3. Tidak cocok — kembalikan nilai asli (uppercase)
     return upper;
@@ -681,6 +704,8 @@ const DB = {
       const data = await res.json();
 
       AppState.karyawan   = Array.isArray(data.karyawan) ? data.karyawan : [];
+      // ✅ BARU: Migrasi Grade lama supaya konsisten dengan opsi dropdown Grade (CONFIG.DEFAULT_GRADE)
+      AppState.karyawan.forEach(k => { if (k.Grade) k.Grade = Utils.resolveGrade(k.Grade); });
       AppState.log        = Array.isArray(data.log) ? data.log : [];
       AppState.jabatan     = Array.isArray(data.jabatan) && data.jabatan.length
         ? data.jabatan
