@@ -1917,19 +1917,6 @@ const UI = {
     this.renderLaptopLog();
   },
 
-  // ✅ DIUBAH: Buka/tutup breakdown per Jabatan untuk 1 SBU di Dashboard Laptop — kini state-driven
-  // (bukan manipulasi DOM langsung) supaya tidak reset saat dropdown nama Jabatan dibuka/ditutup.
-  toggleLaptopSBURow(sbu) {
-    AppState.laptopSBUPanelOpen[sbu] = !AppState.laptopSBUPanelOpen[sbu];
-    UI.renderDashboardLaptop();
-  },
-
-  // ✅ BARU: Buka/tutup dropdown rincian nama karyawan per Jabatan di Dashboard Laptop
-  toggleLaptopJabatanPanel(jabKey) {
-    AppState.laptopJabatanPanelOpen[jabKey] = !AppState.laptopJabatanPanelOpen[jabKey];
-    UI.renderDashboardLaptop();
-  },
-
   // ✅ BARU: Log Perubahan khusus Monitoring Laptop (terpisah dari log Karyawan & Lembur)
   renderLaptopLog() {
     const container = document.getElementById('laptop-log-table');
@@ -2911,6 +2898,20 @@ const Handlers = {
   toggleSlotJabatanPanel(jabKey) {
     AppState.slotJabatanPanelOpen[jabKey] = !AppState.slotJabatanPanelOpen[jabKey];
     UI.renderSlotJabatan();
+  },
+
+  // ✅ DIUBAH: Buka/tutup breakdown per Jabatan untuk 1 SBU di Dashboard Laptop — state-driven
+  // (dipindah ke Handlers, sebelumnya salah ditaruh di UI sehingga onclick="Handlers.toggleLaptopSBURow(...)" gagal)
+  toggleLaptopSBURow(sbu) {
+    AppState.laptopSBUPanelOpen[sbu] = !AppState.laptopSBUPanelOpen[sbu];
+    UI.renderDashboardLaptop();
+  },
+
+  // ✅ DIUBAH: Buka/tutup dropdown rincian nama karyawan per Jabatan di Dashboard Laptop
+  // (dipindah ke Handlers, sebelumnya salah ditaruh di UI sehingga onclick="Handlers.toggleLaptopJabatanPanel(...)" gagal)
+  toggleLaptopJabatanPanel(jabKey) {
+    AppState.laptopJabatanPanelOpen[jabKey] = !AppState.laptopJabatanPanelOpen[jabKey];
+    UI.renderDashboardLaptop();
   },
 
   // ✅ BARU: Minta autentikasi superadmin sebelum mengedit slot suatu SBU
