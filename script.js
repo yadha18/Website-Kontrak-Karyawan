@@ -29,6 +29,8 @@ const CONFIG = {
     'JAWA BAGIAN TENGAH', 'JAWA BAGIAN BARAT', 'JAKARTA & BANTEN',
     'BALI & NUSA TENGGARA', 'PUSAT'
   ],
+  // ✅ BARU: Jabatan yang dikecualikan dari Monitoring Pengadaan Laptop (tidak dihitung sama sekali)
+  JABATAN_LAPTOP_EXCLUDED: ['ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2'],
   // ✅ BARU: Daftar opsi dropdown BKO Jabatan
   DEFAULT_BKO_JABATAN: [
     'ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2', 'COLLECTION SBU',
@@ -200,6 +202,8 @@ const AppState = {
   modals: { editTargetId: null, statusTargetId: null, statusListTarget: null, lemburEditId: null, laptopEditId: null, laptopDetailNIP: null, pendingBuktiBA: null, pendingBuktiBAFileName: null, pendingNipBaruIds: null },
   slotPanelOpen: {}, // ✅ BARU: state buka/tutup accordion slot per SBU, key = nama SBU
   slotJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan, key = "SBU::Jabatan"
+  laptopJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan di Dashboard Laptop, key = "SBU::Jabatan"
+  laptopSBUPanelOpen: {}, // ✅ BARU: state buka/tutup breakdown per SBU di Dashboard Laptop, key = nama SBU
 
   // ✅ BARU: State autentikasi superadmin (khusus sesi ini, reset saat reload halaman)
   superadminAuthed: false,
@@ -594,13 +598,16 @@ const Utils = {
   // Status "Belum Dapat Laptop" dan Jabatan setiap baris (asli maupun virtual) ikut dilampirkan supaya
   // bisa dipakai untuk breakdown per Jabatan di Dashboard Laptop.
   getLaptopRowsWithMissing() {
-    const real = AppState.laptop.map(l => ({
-      ...l,
-      Jabatan: (Utils.findKaryawanByNIP(l.NIP) || {}).Jabatan || ''
-    }));
+    const excluded = CONFIG.JABATAN_LAPTOP_EXCLUDED || []; // ✅ BARU: AE Grade 1 & 2 tidak termasuk pengadaan laptop
+    const real = AppState.laptop
+      .map(l => ({
+        ...l,
+        Jabatan: (Utils.findKaryawanByNIP(l.NIP) || {}).Jabatan || ''
+      }))
+      .filter(l => !excluded.includes(l.Jabatan)); // ✅ BARU: kecualikan meski ada data laptop tercatat
     const nipWithLaptop = new Set(AppState.laptop.map(l => l.NIP).filter(Boolean));
     const missing = AppState.karyawan
-      .filter(k => k.Status !== 'Resign' && k.NIP && !nipWithLaptop.has(k.NIP))
+      .filter(k => k.Status !== 'Resign' && k.NIP && !nipWithLaptop.has(k.NIP) && !excluded.includes(k.Jabatan))
       .map(k => ({
         id: 'missing-' + k.id,
         NIP: k.NIP, NamaPerangkat: '', PA: '', NamaPengguna: k.Nama, SerialNumber: '',
@@ -1809,6 +1816,8 @@ const UI = {
 
     const rows = sbuList.map(sbu => ({ sbu, entries: laptop.filter(l => l.SBU === sbu), ...countBy(laptop.filter(l => l.SBU === sbu)) }));
     const totals = countBy(laptop);
+    // ✅ BARU: Total laptop fisik (bukan virtual "Belum Dapat Laptop"), sudah dikurangi AE Grade 1 & 2
+    const totalLaptopFisik = laptop.filter(l => !l.__virtual).length;
 
     const elCard = document.getElementById('laptop-summary-card');
     if (elCard) {
@@ -1818,7 +1827,7 @@ const UI = {
           <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardLaptopExcel()">⬇ Export Excel</button>
         </div>
         <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);">
-          <div class="stat-card"><div class="stat-label">Total Laptop</div><div class="stat-value accent">${AppState.laptop.length}</div></div>
+          <div class="stat-card"><div class="stat-label">Total Laptop</div><div class="stat-value accent">${totalLaptopFisik}</div></div>
           <div class="stat-card"><div class="stat-label">🟢 Aktif</div><div class="stat-value success">${totals.aktif}</div></div>
           <div class="stat-card"><div class="stat-label">🔴 Belum Dikembalikan</div><div class="stat-value danger">${totals.belum}</div></div>
           <div class="stat-card"><div class="stat-label">✅ Sudah Dikembalikan</div><div class="stat-value warning">${totals.sudah}</div></div>
@@ -1837,31 +1846,57 @@ const UI = {
             </tr></thead>
             ${rows.map(r => {
               const sbuId = 'sbu_' + r.sbu.replace(/[^a-zA-Z0-9]/g, '_');
+              const sbuOpen = !!AppState.laptopSBUPanelOpen[r.sbu]; // ✅ BARU: state-driven, tidak reset saat re-render
               // ✅ BARU: breakdown per Jabatan di dalam SBU ini
               const byJabatan = {};
               r.entries.forEach(e => {
                 const jab = e.Jabatan || 'Tidak Diketahui';
                 (byJabatan[jab] = byJabatan[jab] || []).push(e);
               });
+              // ✅ BARU: setiap baris Jabatan bisa diklik lagi untuk membuka dropdown rincian nama karyawan
               const jabatanRows = Object.keys(byJabatan).sort().map(jab => {
                 const c = countBy(byJabatan[jab]);
+                const jabKey = `${r.sbu}::${jab}`;
+                const jabKeyEscaped = jabKey.replace(/'/g, "\\'");
+                const jabOpen = !!AppState.laptopJabatanPanelOpen[jabKey];
+
+                const namesList = byJabatan[jab]
+                  .slice()
+                  .sort((a, b) => (a.NamaPengguna || '').localeCompare(b.NamaPengguna || ''))
+                  .map(e => `
+                    <div class="slot-jabatan-employee">
+                      <span>${e.NamaPengguna || '(tanpa nama)'}</span>
+                      <span style="display:flex;align-items:center;gap:8px;">
+                        <span class="mono" style="color:var(--text2);font-size:11px;">${e.NIP || '-'}</span>
+                        <span class="pill pill-${e.Status === 'Aktif' ? 'green' : e.Status === 'Belum Dikembalikan' ? 'red' : e.Status === 'Sudah Dikembalikan' ? 'yellow' : 'gray'}">${e.Status || 'Belum Diisi'}</span>
+                      </span>
+                    </div>`).join('');
+
                 return `
-                  <tr style="background:var(--surface2);font-size:12px;">
+                  <tr class="slot-jabatan-row" style="background:var(--surface2);font-size:12px;" onclick="Handlers.toggleLaptopJabatanPanel('${jabKeyEscaped}')" title="Klik untuk lihat rincian nama karyawan">
                     <td></td>
-                    <td style="padding-left:26px;color:var(--text2);">↳ ${jab}</td>
+                    <td style="padding-left:26px;color:var(--text2);">
+                      <span class="slot-accordion-arrow ${jabOpen ? 'open' : ''}" style="font-size:9px;margin-right:6px;display:inline-block;">▶</span>↳ ${jab}
+                    </td>
                     <td class="mono" style="text-align:center;font-weight:600;">${c.total}</td>
                     <td class="mono" style="text-align:center;">${c.aktif}</td>
                     <td class="mono" style="text-align:center;">${c.belum}</td>
                     <td class="mono" style="text-align:center;">${c.sudah}</td>
                     <td class="mono" style="text-align:center;">${c.belumDapat}</td>
                     <td class="mono" style="text-align:center;color:var(--text2);">${c.kosong}</td>
-                  </tr>`;
+                  </tr>
+                  ${jabOpen ? `
+                  <tr class="slot-jabatan-detail-row">
+                    <td colspan="8" style="padding:0;">
+                      <div class="slot-jabatan-employee-list">${namesList || `<div style="color:var(--text3);font-size:12px;padding:6px 2px;">Tidak ada karyawan.</div>`}</div>
+                    </td>
+                  </tr>` : ''}`;
               }).join('');
 
               return `
                 <tbody>
-                  <tr style="cursor:pointer;" onclick="Handlers.toggleLaptopSBURow('${sbuId}')" title="Klik untuk lihat breakdown per Jabatan">
-                    <td id="${sbuId}_arrow" style="width:22px;text-align:center;color:var(--text2);">▸</td>
+                  <tr style="cursor:pointer;" onclick="Handlers.toggleLaptopSBURow('${r.sbu.replace(/'/g, "\\'")}')" title="Klik untuk lihat breakdown per Jabatan">
+                    <td id="${sbuId}_arrow" style="width:22px;text-align:center;color:var(--text2);">${sbuOpen ? '▾' : '▸'}</td>
                     <td style="font-weight:500;">${r.sbu}</td>
                     <td class="mono" style="text-align:center;font-weight:600;">${r.total}</td>
                     <td class="mono" style="text-align:center;">${r.aktif}</td>
@@ -1871,7 +1906,7 @@ const UI = {
                     <td class="mono" style="text-align:center;color:var(--text2);">${r.kosong}</td>
                   </tr>
                 </tbody>
-                <tbody id="${sbuId}_detail" style="display:none;">
+                <tbody id="${sbuId}_detail" style="display:${sbuOpen ? '' : 'none'};">
                   ${jabatanRows || `<tr><td></td><td colspan="7" style="color:var(--text2);font-size:12px;padding:8px 12px;">Tidak ada data di SBU ini</td></tr>`}
                 </tbody>`;
             }).join('')}
@@ -1882,14 +1917,17 @@ const UI = {
     this.renderLaptopLog();
   },
 
-  // ✅ BARU: Buka/tutup breakdown per Jabatan untuk 1 SBU di Dashboard Laptop
-  toggleLaptopSBURow(sbuId) {
-    const el = document.getElementById(sbuId + '_detail');
-    const arrow = document.getElementById(sbuId + '_arrow');
-    if (!el) return;
-    const isOpen = el.style.display !== 'none';
-    el.style.display = isOpen ? 'none' : '';
-    if (arrow) arrow.textContent = isOpen ? '▸' : '▾';
+  // ✅ DIUBAH: Buka/tutup breakdown per Jabatan untuk 1 SBU di Dashboard Laptop — kini state-driven
+  // (bukan manipulasi DOM langsung) supaya tidak reset saat dropdown nama Jabatan dibuka/ditutup.
+  toggleLaptopSBURow(sbu) {
+    AppState.laptopSBUPanelOpen[sbu] = !AppState.laptopSBUPanelOpen[sbu];
+    UI.renderDashboardLaptop();
+  },
+
+  // ✅ BARU: Buka/tutup dropdown rincian nama karyawan per Jabatan di Dashboard Laptop
+  toggleLaptopJabatanPanel(jabKey) {
+    AppState.laptopJabatanPanelOpen[jabKey] = !AppState.laptopJabatanPanelOpen[jabKey];
+    UI.renderDashboardLaptop();
   },
 
   // ✅ BARU: Log Perubahan khusus Monitoring Laptop (terpisah dari log Karyawan & Lembur)
