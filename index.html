@@ -267,6 +267,7 @@
         <input type="text" id="searchKaryawan" placeholder="🔍  Cari NIP, Nama, SBU..." oninput="resetPageAndRender()">
         <select id="filterJabatan" onchange="resetPageAndRender()"><option value="">Semua Jabatan</option></select>
         <select id="filterSBU" onchange="resetPageAndRender()"><option value="">Semua SBU</option></select>
+        <select id="filterGrade" onchange="resetPageAndRender()"><option value="">Semua Grade</option></select>
         <select id="filterStatus"  onchange="resetPageAndRender()">
           <option value="">Semua Status</option>
           <option value="Baru Masuk">Baru Masuk</option>
@@ -535,11 +536,11 @@
       </div>
     </div>
     
-    <!-- ✅ BARU: Grade -->
+    <!-- ✅ DIUBAH: Grade sekarang dropdown, bukan input teks bebas -->
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Grade</label>
-        <input type="text" class="form-control" id="editGrade" placeholder="mis. G1, G2, Staff">
+        <select class="form-control" id="editGrade"><option value="">Pilih Grade</option></select>
       </div>
     </div>
 

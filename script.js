@@ -31,6 +31,14 @@ const CONFIG = {
   ],
   // ✅ BARU: Jabatan yang dikecualikan dari Monitoring Pengadaan Laptop (tidak dihitung sama sekali)
   JABATAN_LAPTOP_EXCLUDED: ['ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2'],
+  // ✅ BARU: Daftar opsi dropdown Grade karyawan (diurutkan otomatis oleh Utils.sortGradeList saat dipakai)
+  DEFAULT_GRADE: [
+    'OFFICER GRADE-1', 'OFFICER GRADE-8',
+    'MARKETING GRADE-9', 'MARKETING GRADE-10', 'MARKETING GRADE-16',
+    'MARKETING GRADE-23', 'MARKETING GRADE-25', 'MARKETING GRADE-26',
+    'MARKETING GRADE-29', 'MARKETING GRADE-31', 'MARKETING GRADE-33', 'MARKETING GRADE-35',
+    'SALES GRADE-1', 'SALES GRADE-2'
+  ],
   // ✅ BARU: Daftar opsi dropdown BKO Jabatan
   DEFAULT_BKO_JABATAN: [
     'ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2', 'COLLECTION SBU',
@@ -641,6 +649,18 @@ const Utils = {
       el.appendChild(opt); 
     });
     el.value = cur;
+  },
+  // ✅ BARU: Urutkan daftar Grade karyawan (mis. "OFFICER GRADE-1", "MARKETING GRADE-10")
+  // berdasarkan angka Grade menaik (1, 2, ... terbesar), bukan urutan abjad teks biasa.
+  sortGradeList(list) {
+    return list.slice().sort((a, b) => {
+      const numA = parseInt((String(a).match(/(\d+)\s*$/) || [])[1], 10);
+      const numB = parseInt((String(b).match(/(\d+)\s*$/) || [])[1], 10);
+      const nA = isNaN(numA) ? Infinity : numA;
+      const nB = isNaN(numB) ? Infinity : numB;
+      if (nA !== nB) return nA - nB;
+      return String(a).localeCompare(String(b));
+    });
   }
 };
 
@@ -1513,9 +1533,12 @@ const UI = {
     const fK   = document.getElementById('filterJabatan')?.value || '';
     const fSBU = document.getElementById('filterSBU')?.value || '';
     const fS   = document.getElementById('filterStatus')?.value || '';
+    const fG   = document.getElementById('filterGrade')?.value || ''; // ✅ BARU
 
     Utils.fillSelect('filterJabatan', [...new Set(karyawan.map(k => k.Jabatan))].filter(Boolean));
     Utils.fillSelect('filterSBU', [...new Set(karyawan.map(k => k.SBU))].filter(Boolean));
+    // ✅ BARU: dropdown Grade, terurut dari angka Grade terkecil (1) ke terbesar
+    Utils.fillSelect('filterGrade', Utils.sortGradeList([...new Set(karyawan.map(k => k.Grade))].filter(Boolean)));
 
     // ✅ BARU: Isi dropdown filter export dengan daftar SBU resmi (bukan hanya yang sudah ada datanya)
     const elExportSBU = document.getElementById('exportFilterSBU');
@@ -1529,7 +1552,8 @@ const UI = {
       (!q  || k.NIP.toLowerCase().includes(q) || k.Nama.toLowerCase().includes(q) || k.SBU.toLowerCase().includes(q)) &&
       (!fK || k.Jabatan === fK) &&
       (!fSBU || k.SBU === fSBU) &&
-      (!fS || k.Status === fS)
+      (!fS || k.Status === fS) &&
+      (!fG || k.Grade === fG)
     );
 
     const tbody = document.getElementById('karyawanBody');
@@ -2618,6 +2642,19 @@ const Handlers = {
     if (elSubBidang) {
       elSubBidang.innerHTML = '<option value="">— Pilih Sub Bidang —</option>' +
         AppState.subBidang.map(s => `<option value="${s.nama}">${s.nama}</option>`).join('');
+    }
+
+    // ✅ BARU: Grade dropdown — opsi tetap dari CONFIG, diurutkan dari angka Grade terkecil ke terbesar
+    const elGrade = document.getElementById('editGrade');
+    if (elGrade) {
+      const gradeOptions = Utils.sortGradeList(CONFIG.DEFAULT_GRADE);
+      elGrade.innerHTML = '<option value="">— Pilih Grade —</option>' +
+        gradeOptions.map(g => `<option value="${g}">${g}</option>`).join('');
+      // Jaga data lama: kalau Grade karyawan ini tidak ada di daftar tetap, tetap tampilkan sebagai opsi
+      const curGrade = (id ? (AppState.karyawan.find(k => k.id === id) || {}).Grade : '') || '';
+      if (curGrade && !gradeOptions.includes(curGrade)) {
+        elGrade.insertAdjacentHTML('beforeend', `<option value="${curGrade}">${curGrade} (lama)</option>`);
+      }
     }
 
     const emp = id ? AppState.karyawan.find(k => k.id === id) : Models.Karyawan();
