@@ -149,7 +149,15 @@ const CONFIG = {
   },
 
   // ✅ BARU: Konfigurasi Monitoring Pengadaan Laptop
-  STATUS_LAPTOP_OPTIONS: ['Aktif', 'Belum Dikembalikan', 'Sudah Dikembalikan']
+  STATUS_LAPTOP_OPTIONS: ['Aktif', 'Belum Dikembalikan', 'Sudah Dikembalikan'],
+  // ✅ BARU: Opsi untuk dropdown FILTER tabel saja (bukan status yang bisa dipilih saat edit laptop) —
+  // "Belum Dapat Laptop" adalah status virtual/hasil hitung, bukan status asli yang tersimpan.
+  get STATUS_LAPTOP_FILTER_OPTIONS() { return [...this.STATUS_LAPTOP_OPTIONS, 'Belum Dapat Laptop']; },
+
+  // ✅ BARU: Nilai default PJTK & No. SP2K — dipakai kalau belum ada data karyawan sama sekali untuk
+  // dijadikan acuan "nilai paling sering dipakai" (supaya tidak dibiarkan kosong).
+  DEFAULT_PJTK: 'PT. HALEYORA POWERINDO',
+  DEFAULT_NO_SP2K: '4500028490'
 
   // ✅ DIHAPUS: SLOT_PER_SBU & TOTAL_SLOT_KARYAWAN statis tidak dipakai lagi.
   // Slot Jabatan per SBU sekarang dibangun otomatis dari data Excel yang
@@ -534,6 +542,19 @@ const Utils = {
     return AppState.karyawan.find(k => k.NIP.replace(/^0+/, '') === stripped) || null;
   },
 
+  // ✅ BARU: Nilai yang paling sering dipakai untuk 1 kolom di Data Karyawan (mode) — dipakai untuk
+  // otomatis mengisi kolom seperti PJTK / No. SP2K pada karyawan baru, mengikuti data yang sudah ada.
+  getMostCommonValue(field) {
+    const counts = {};
+    AppState.karyawan.forEach(k => {
+      const v = String(k[field] || '').trim();
+      if (v) counts[v] = (counts[v] || 0) + 1;
+    });
+    let best = '', bestCount = 0;
+    Object.keys(counts).forEach(v => { if (counts[v] > bestCount) { best = v; bestCount = counts[v]; } });
+    return best;
+  },
+
   // ✅ BARU: Kompres & resize gambar (Bukti Berita Acara) sebelum disimpan sebagai base64 —
   // supaya ukuran data tetap kecil (data disimpan langsung di database bersama data lain).
   compressImageFile(file, maxWidth = 900, quality = 0.7) {
@@ -566,6 +587,27 @@ const Utils = {
     const isResign = emp && emp.Status === 'Resign';
     if (isResign) return hasBukti ? 'Sudah Dikembalikan' : 'Belum Dikembalikan';
     return 'Aktif';
+  },
+
+  // ✅ BARU: Gabungkan data Laptop asli + baris "virtual" untuk karyawan aktif yang belum tercatat
+  // punya laptop sama sekali (selisih dari Data Karyawan, dicocokkan lewat NIP). Baris virtual diberi
+  // Status "Belum Dapat Laptop" dan Jabatan setiap baris (asli maupun virtual) ikut dilampirkan supaya
+  // bisa dipakai untuk breakdown per Jabatan di Dashboard Laptop.
+  getLaptopRowsWithMissing() {
+    const real = AppState.laptop.map(l => ({
+      ...l,
+      Jabatan: (Utils.findKaryawanByNIP(l.NIP) || {}).Jabatan || ''
+    }));
+    const nipWithLaptop = new Set(AppState.laptop.map(l => l.NIP).filter(Boolean));
+    const missing = AppState.karyawan
+      .filter(k => k.Status !== 'Resign' && k.NIP && !nipWithLaptop.has(k.NIP))
+      .map(k => ({
+        id: 'missing-' + k.id,
+        NIP: k.NIP, NamaPerangkat: '', PA: '', NamaPengguna: k.Nama, SerialNumber: '',
+        SBU: k.SBU, Jabatan: k.Jabatan, Status: 'Belum Dapat Laptop',
+        BuktiBA: null, BuktiBAFileName: null, __virtual: true
+      }));
+    return real.concat(missing);
   },
   // ✅ DIUBAH: Normalisasi nilai Bulan ke format baku "NamaBulan Tahun" — mendukung 2026 & 2027.
   // Mendeteksi tahun dari teks jika ada (mis. "Januari 2027" → tetap 2027); kalau tidak ada tahun
@@ -884,7 +926,15 @@ const EmployeeService = {
     const toInsert = classified.filter(r => r.__uploadStatus === 'new');
     const toMigrate = classified.filter(r => r.__uploadStatus === 'nip_changed'); // ✅ BARU
 
-    const newEmployees = toInsert.map(data => Models.Karyawan(data));
+    // ✅ BARU: Kalau kolom PJTK / No. SP2K kosong di file untuk baris BARU, otomatis isi dengan nilai
+    // yang paling sering dipakai di Data Karyawan yang sudah ada (dihitung sebelum batch ini masuk).
+    const defaultPJTK = Utils.getMostCommonValue('PJTK') || CONFIG.DEFAULT_PJTK;       // ✅ DIUBAH: fallback ke default kalau belum ada data sama sekali
+    const defaultNoSP2K = Utils.getMostCommonValue('NoSP2K') || CONFIG.DEFAULT_NO_SP2K; // ✅ DIUBAH
+    const newEmployees = toInsert.map(data => {
+      if (!String(data.PJTK || '').trim() && defaultPJTK) data.PJTK = defaultPJTK;
+      if (!String(data.NoSP2K || '').trim() && defaultNoSP2K) data.NoSP2K = defaultNoSP2K;
+      return Models.Karyawan(data);
+    });
     AppState.karyawan = AppState.karyawan.concat(newEmployees);
 
     // ✅ BARU: Migrasi NIP lama → NIP baru untuk karyawan yang NIK-nya cocok (ganti NIP, bukan
@@ -1663,7 +1713,7 @@ const UI = {
           <div class="card-title" style="margin:0;">💰 Ringkasan Realisasi</div>
           <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardNonPOExcel()">⬇ Export Excel</button>
         </div>
-        <div class="stat-grid cols-3">
+        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
           <div class="stat-card"><div class="stat-label">Total Realisasi SPPD/Lembur</div><div class="stat-value accent">${Utils.formatRupiah(totalRealisasi)}</div></div>
           <div class="stat-card"><div class="stat-label">Man Fee (7%)</div><div class="stat-value warning">${Utils.formatRupiah(manFee)}</div></div>
           <div class="stat-card"><div class="stat-label">Grand Total</div><div class="stat-value success">${Utils.formatRupiah(grandTotal)}</div></div>
@@ -1742,22 +1792,23 @@ const UI = {
   },
 
   // ✅ BARU: Render Dashboard Laptop — ringkasan status per SBU (mirip Dashboard Non PO)
+  // ✅ DIUBAH: Dashboard Laptop — sekarang bisa expand per SBU lalu per Jabatan, dan menghitung
+  // karyawan yang belum dapat laptop sama sekali (selisih dari Data Karyawan).
   renderDashboardLaptop() {
     const sbuList = CONFIG.DEFAULT_SBU;
-    const laptop = AppState.laptop;
+    const laptop = Utils.getLaptopRowsWithMissing(); // gabungan data asli + virtual "Belum Dapat Laptop"
 
-    const rows = sbuList.map(sbu => {
-      const entries = laptop.filter(l => l.SBU === sbu);
-      const aktif = entries.filter(l => l.Status === 'Aktif').length;
-      const belum = entries.filter(l => l.Status === 'Belum Dikembalikan').length;
-      const sudah = entries.filter(l => l.Status === 'Sudah Dikembalikan').length;
-      const kosong = entries.filter(l => !l.Status).length;
-      return { sbu, total: entries.length, aktif, belum, sudah, kosong };
+    const countBy = (arr) => ({
+      total: arr.length,
+      aktif: arr.filter(l => l.Status === 'Aktif').length,
+      belum: arr.filter(l => l.Status === 'Belum Dikembalikan').length,
+      sudah: arr.filter(l => l.Status === 'Sudah Dikembalikan').length,
+      belumDapat: arr.filter(l => l.Status === 'Belum Dapat Laptop').length,
+      kosong: arr.filter(l => !l.Status).length
     });
 
-    const totalAktif = laptop.filter(l => l.Status === 'Aktif').length;
-    const totalBelum = laptop.filter(l => l.Status === 'Belum Dikembalikan').length;
-    const totalSudah = laptop.filter(l => l.Status === 'Sudah Dikembalikan').length;
+    const rows = sbuList.map(sbu => ({ sbu, entries: laptop.filter(l => l.SBU === sbu), ...countBy(laptop.filter(l => l.SBU === sbu)) }));
+    const totals = countBy(laptop);
 
     const elCard = document.getElementById('laptop-summary-card');
     if (elCard) {
@@ -1766,11 +1817,12 @@ const UI = {
           <div class="card-title" style="margin:0;">💻 Ringkasan Status Laptop</div>
           <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardLaptopExcel()">⬇ Export Excel</button>
         </div>
-        <div class="stat-grid cols-4">
-          <div class="stat-card"><div class="stat-label">Total Laptop</div><div class="stat-value accent">${laptop.length}</div></div>
-          <div class="stat-card"><div class="stat-label">🟢 Aktif</div><div class="stat-value success">${totalAktif}</div></div>
-          <div class="stat-card"><div class="stat-label">🔴 Belum Dikembalikan</div><div class="stat-value danger">${totalBelum}</div></div>
-          <div class="stat-card"><div class="stat-label">✅ Sudah Dikembalikan</div><div class="stat-value warning">${totalSudah}</div></div>
+        <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);">
+          <div class="stat-card"><div class="stat-label">Total Laptop</div><div class="stat-value accent">${AppState.laptop.length}</div></div>
+          <div class="stat-card"><div class="stat-label">🟢 Aktif</div><div class="stat-value success">${totals.aktif}</div></div>
+          <div class="stat-card"><div class="stat-label">🔴 Belum Dikembalikan</div><div class="stat-value danger">${totals.belum}</div></div>
+          <div class="stat-card"><div class="stat-label">✅ Sudah Dikembalikan</div><div class="stat-value warning">${totals.sudah}</div></div>
+          <div class="stat-card"><div class="stat-label">⛔ Belum Dapat Laptop</div><div class="stat-value" style="color:var(--text2)">${totals.belumDapat}</div></div>
         </div>`;
     }
 
@@ -1779,23 +1831,65 @@ const UI = {
       elTable.innerHTML = `
         <div class="table-wrap">
           <table>
-            <thead><tr><th>SBU</th><th>Total Laptop</th><th>🟢 Aktif</th><th>🔴 Belum Dikembalikan</th><th>✅ Sudah Dikembalikan</th><th>Belum Diisi Status</th></tr></thead>
-            <tbody>
-              ${rows.map(r => `
-                <tr>
-                  <td style="font-weight:500;">${r.sbu}</td>
-                  <td class="mono" style="text-align:center;font-weight:600;">${r.total}</td>
-                  <td class="mono" style="text-align:center;">${r.aktif}</td>
-                  <td class="mono" style="text-align:center;">${r.belum}</td>
-                  <td class="mono" style="text-align:center;">${r.sudah}</td>
-                  <td class="mono" style="text-align:center;color:var(--text2);">${r.kosong}</td>
-                </tr>`).join('')}
-            </tbody>
+            <thead><tr>
+              <th></th><th>SBU</th><th>Total</th><th>🟢 Aktif</th><th>🔴 Belum Dikembalikan</th>
+              <th>✅ Sudah Dikembalikan</th><th>⛔ Belum Dapat Laptop</th><th>Belum Diisi Status</th>
+            </tr></thead>
+            ${rows.map(r => {
+              const sbuId = 'sbu_' + r.sbu.replace(/[^a-zA-Z0-9]/g, '_');
+              // ✅ BARU: breakdown per Jabatan di dalam SBU ini
+              const byJabatan = {};
+              r.entries.forEach(e => {
+                const jab = e.Jabatan || 'Tidak Diketahui';
+                (byJabatan[jab] = byJabatan[jab] || []).push(e);
+              });
+              const jabatanRows = Object.keys(byJabatan).sort().map(jab => {
+                const c = countBy(byJabatan[jab]);
+                return `
+                  <tr style="background:var(--surface2);font-size:12px;">
+                    <td></td>
+                    <td style="padding-left:26px;color:var(--text2);">↳ ${jab}</td>
+                    <td class="mono" style="text-align:center;font-weight:600;">${c.total}</td>
+                    <td class="mono" style="text-align:center;">${c.aktif}</td>
+                    <td class="mono" style="text-align:center;">${c.belum}</td>
+                    <td class="mono" style="text-align:center;">${c.sudah}</td>
+                    <td class="mono" style="text-align:center;">${c.belumDapat}</td>
+                    <td class="mono" style="text-align:center;color:var(--text2);">${c.kosong}</td>
+                  </tr>`;
+              }).join('');
+
+              return `
+                <tbody>
+                  <tr style="cursor:pointer;" onclick="Handlers.toggleLaptopSBURow('${sbuId}')" title="Klik untuk lihat breakdown per Jabatan">
+                    <td id="${sbuId}_arrow" style="width:22px;text-align:center;color:var(--text2);">▸</td>
+                    <td style="font-weight:500;">${r.sbu}</td>
+                    <td class="mono" style="text-align:center;font-weight:600;">${r.total}</td>
+                    <td class="mono" style="text-align:center;">${r.aktif}</td>
+                    <td class="mono" style="text-align:center;">${r.belum}</td>
+                    <td class="mono" style="text-align:center;">${r.sudah}</td>
+                    <td class="mono" style="text-align:center;">${r.belumDapat}</td>
+                    <td class="mono" style="text-align:center;color:var(--text2);">${r.kosong}</td>
+                  </tr>
+                </tbody>
+                <tbody id="${sbuId}_detail" style="display:none;">
+                  ${jabatanRows || `<tr><td></td><td colspan="7" style="color:var(--text2);font-size:12px;padding:8px 12px;">Tidak ada data di SBU ini</td></tr>`}
+                </tbody>`;
+            }).join('')}
           </table>
         </div>`;
     }
 
     this.renderLaptopLog();
+  },
+
+  // ✅ BARU: Buka/tutup breakdown per Jabatan untuk 1 SBU di Dashboard Laptop
+  toggleLaptopSBURow(sbuId) {
+    const el = document.getElementById(sbuId + '_detail');
+    const arrow = document.getElementById(sbuId + '_arrow');
+    if (!el) return;
+    const isOpen = el.style.display !== 'none';
+    el.style.display = isOpen ? 'none' : '';
+    if (arrow) arrow.textContent = isOpen ? '▸' : '▾';
   },
 
   // ✅ BARU: Log Perubahan khusus Monitoring Laptop (terpisah dari log Karyawan & Lembur)
@@ -1829,13 +1923,14 @@ const UI = {
 
   // ✅ BARU: Render Tabel Monitoring Pengadaan Laptop
   renderLaptopTable() {
-    const { laptop, laptopPagination } = AppState;
+    const { laptopPagination } = AppState;
+    const laptop = Utils.getLaptopRowsWithMissing(); // ✅ DIUBAH: sertakan karyawan yang belum dapat laptop
     const q    = (document.getElementById('searchLaptop')?.value || '').toLowerCase();
     const fSBU = document.getElementById('filterLaptopSBU')?.value || '';
     const fSt  = document.getElementById('filterLaptopStatus')?.value || '';
 
     Utils.fillSelect('filterLaptopSBU', CONFIG.DEFAULT_SBU);
-    Utils.fillSelect('filterLaptopStatus', CONFIG.STATUS_LAPTOP_OPTIONS);
+    Utils.fillSelect('filterLaptopStatus', CONFIG.STATUS_LAPTOP_FILTER_OPTIONS); // ✅ DIUBAH: sertakan "Belum Dapat Laptop"
 
     const filtered = laptop.filter(l =>
       (!q || l.NIP.toLowerCase().includes(q) || l.NamaPengguna.toLowerCase().includes(q) || l.SerialNumber.toLowerCase().includes(q) || l.NamaPerangkat.toLowerCase().includes(q)) &&
@@ -1861,16 +1956,18 @@ const UI = {
     const startIdx = (laptopPagination.page - 1) * laptopPagination.size;
     const paginated = filtered.slice(startIdx, startIdx + laptopPagination.size);
 
-    const statusPill = { 'Aktif': 'pill-green', 'Belum Dikembalikan': 'pill-red', 'Sudah Dikembalikan': 'pill-blue' };
+    const statusPill = { 'Aktif': 'pill-green', 'Belum Dikembalikan': 'pill-red', 'Sudah Dikembalikan': 'pill-blue', 'Belum Dapat Laptop': 'pill-gray' };
 
     tbody.innerHTML = paginated.map((l, i) => {
       const suggestion = Utils.suggestStatusLaptop(l.NIP, !!l.BuktiBA);
-      const mismatch = l.Status && suggestion !== l.Status;
+      const mismatch = !l.__virtual && l.Status && suggestion !== l.Status;
       return `
-      <tr>
+      <tr${l.__virtual ? ' style="opacity:.75"' : ''}>
         <td style="white-space:nowrap">
-          <button class="btn btn-secondary btn-sm" onclick="Handlers.openLaptopModal(${l.id})">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="Handlers.deleteLaptop(${l.id})">🗑</button>
+          ${l.__virtual
+            ? `<button class="btn btn-primary btn-sm" onclick="Handlers.openLaptopModal(null, '${l.NIP}')">➕ Tambah</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="Handlers.openLaptopModal(${l.id})">✏️</button>
+               <button class="btn btn-danger btn-sm" onclick="Handlers.deleteLaptop(${l.id})">🗑</button>`}
         </td>
         <td class="mono" style="text-align:center;">${startIdx + i + 1}</td>
         <td class="mono">${l.NIP || '—'}</td>
@@ -1972,7 +2069,6 @@ const Handlers = {
     document.querySelectorAll('.nav-item').forEach(n => {
       if (n.getAttribute('onclick')?.includes("'" + page + "'")) n.classList.add('active');
     });
-    Handlers.closeSidebarOnMobile(); // ✅ RESPONSIVE: tutup drawer sidebar otomatis setelah pilih menu di HP/tablet
 
     // ✅ DIUBAH: Dashboard Non PO & Tabel Lembur digabung jadi 1 halaman per-bulan (page-lembur-bulan),
     // dipanggil lewat Handlers.navigateBulan() dari menu sidebar — tidak lagi lewat navigate() biasa.
@@ -2025,20 +2121,6 @@ const Handlers = {
     });
     document.getElementById('lemburBulanTitle').textContent = `📅 Data Lembur & SPPD — ${bulan}`;
     this.setLemburViewTab(AppState.lemburViewTab || 'dashboard');
-    this.closeSidebarOnMobile(); // ✅ RESPONSIVE: tutup drawer sidebar otomatis setelah pilih bulan di HP/tablet
-  },
-
-  // ✅ RESPONSIVE: buka/tutup sidebar sebagai drawer di tablet/HP (≤768px)
-  toggleSidebar(force) {
-    const sidebar = document.getElementById('sidebar');
-    const backdrop = document.getElementById('sidebarBackdrop');
-    if (!sidebar || !backdrop) return;
-    const shouldOpen = typeof force === 'boolean' ? force : !sidebar.classList.contains('open');
-    sidebar.classList.toggle('open', shouldOpen);
-    backdrop.classList.toggle('open', shouldOpen);
-  },
-  closeSidebarOnMobile() {
-    if (window.innerWidth <= 768) this.toggleSidebar(false);
   },
 
   // ✅ BARU: Ganti tab dalam halaman bulan Lembur & SPPD — 'dashboard' (Dashboard Non PO) atau 'tabel' (Tabel Data)
@@ -2149,7 +2231,7 @@ const Handlers = {
       const elStats = document.getElementById('previewStats');
       if (elStats) {
         elStats.innerHTML = `
-          <div class="stat-grid cols-5" style="margin-bottom:16px;">
+          <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;">
             <div class="stat-card"><div class="stat-label">✔ Data Baru (akan ditambahkan)</div><div class="stat-value success">${stats.new}</div></div>
             <div class="stat-card"><div class="stat-label">🔁 NIP Diperbarui (NIK cocok)</div><div class="stat-value accent">${stats.nipChanged}</div></div>
             <div class="stat-card"><div class="stat-label">🧩 NIP Sudah Ada (lengkapi kolom kosong)</div><div class="stat-value accent">${stats.duplicateExisting}</div></div>
@@ -2203,7 +2285,7 @@ const Handlers = {
     const elStats = document.getElementById('previewStats');
     if (elStats) {
       elStats.innerHTML = `
-        <div class="stat-grid cols-2" style="margin-bottom:16px;">
+        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
           <div class="stat-card"><div class="stat-label">✔ Data Valid (akan ditambahkan)</div><div class="stat-value success">${stats.valid}</div></div>
           <div class="stat-card"><div class="stat-label">✕ Tidak Valid (dilewati)</div><div class="stat-value danger">${stats.invalid}</div></div>
         </div>
@@ -2283,7 +2365,7 @@ const Handlers = {
     const elStats = document.getElementById('previewStats');
     if (elStats) {
       elStats.innerHTML = `
-        <div class="stat-grid cols-2" style="margin-bottom:16px;">
+        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
           <div class="stat-card"><div class="stat-label">✔ Data Valid (akan ditambahkan)</div><div class="stat-value success">${stats.valid}</div></div>
           <div class="stat-card"><div class="stat-label">✕ Tidak Valid (dilewati)</div><div class="stat-value danger">${stats.invalid}</div></div>
         </div>
@@ -2524,8 +2606,8 @@ const Handlers = {
     document.getElementById('editSBU').value          = emp.SBU;
     document.getElementById('editGajiPokok').value    = emp.GajiPokok || '';                   // ✅ BARU
     document.getElementById('editHargaSatuan').value  = emp.HargaSatuan || '';                 // ✅ BARU
-    document.getElementById('editPJTK').value         = emp.PJTK || '';                        // ✅ BARU
-    document.getElementById('editNoSP2K').value       = emp.NoSP2K || '';                      // ✅ BARU
+    document.getElementById('editPJTK').value         = emp.PJTK || (id ? '' : (Utils.getMostCommonValue('PJTK') || CONFIG.DEFAULT_PJTK));       // ✅ DIUBAH: fallback ke default
+    document.getElementById('editNoSP2K').value       = emp.NoSP2K || (id ? '' : (Utils.getMostCommonValue('NoSP2K') || CONFIG.DEFAULT_NO_SP2K)); // ✅ DIUBAH: fallback ke default
     document.getElementById('editNamaTL').value       = emp.NamaTL || '';                      // ✅ BARU
     document.getElementById('editSubBidang').value    = emp.SubBidang || '';                   // ✅ BARU
     document.getElementById('editBKOJabatan').value   = emp.BKOJabatan; // ✅ set value dropdown
@@ -3175,7 +3257,7 @@ const Handlers = {
   },
 
   // ✅ BARU: Buka modal Tambah/Edit Monitoring Laptop (id null = tambah baru)
-  openLaptopModal(id) {
+  openLaptopModal(id, prefillNIP) {
     AppState.modals.laptopEditId = id;
     AppState.modals.pendingBuktiBA = null;
     AppState.modals.pendingBuktiBAFileName = null;
@@ -3201,7 +3283,8 @@ const Handlers = {
         document.getElementById('laptopBuktiPreviewImg').src = item.BuktiBA;
       }
     } else {
-      document.getElementById('laptopNIP').value = '';
+      // ✅ BARU: prefillNIP dipakai dari tombol "➕ Tambah" pada baris "Belum Dapat Laptop" di tabel
+      document.getElementById('laptopNIP').value = prefillNIP || '';
       document.getElementById('laptopNamaPengguna').value = '';
       document.getElementById('laptopSBU').value = '';
       document.getElementById('laptopNamaPerangkat').value = '';
@@ -3386,11 +3469,14 @@ const Handlers = {
   },
 
   // ✅ BARU: Export Excel — Tabel Monitoring Laptop (gambar bukti tidak diexport, hanya status ada/tidaknya)
+  // ✅ DIUBAH: Export Excel Tabel Monitoring Laptop — sekarang menyertakan baris karyawan yang
+  // belum dapat laptop juga (NIP terisi, kolom laptop kosong, Status = "Belum Dapat Laptop").
   exportLaptopExcel() {
-    if (!AppState.laptop.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
-    const rows = AppState.laptop.map((l, i) => ({
-      'No': i + 1, 'Nama Perangkat': l.NamaPerangkat, 'PA': l.PA, 'Nama Pengguna': l.NamaPengguna,
-      'Serial Number': l.SerialNumber, 'Regional (SBU)': l.SBU, 'Status Laptop': l.Status || '',
+    const combined = Utils.getLaptopRowsWithMissing();
+    if (!combined.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
+    const rows = combined.map((l, i) => ({
+      'No': i + 1, 'NIP': l.NIP, 'Nama Perangkat': l.NamaPerangkat, 'PA': l.PA, 'Nama Pengguna': l.NamaPengguna,
+      'Serial Number': l.SerialNumber, 'Regional (SBU)': l.SBU, 'Jabatan': l.Jabatan || '', 'Status Laptop': l.Status || '',
       'Bukti Berita Acara': l.BuktiBA ? 'Ada' : 'Belum Ada'
     }));
     const wb = XLSX.utils.book_new();
@@ -3409,21 +3495,48 @@ const Handlers = {
   },
 
   // ✅ BARU: Export Excel — Dashboard Laptop (ringkasan status per SBU)
+  // ✅ DIUBAH: Export Excel Dashboard Laptop — sekarang menyertakan kolom "Belum Dapat Laptop"
+  // dan sheet kedua berisi breakdown per SBU + per Jabatan.
   exportDashboardLaptopExcel() {
-    if (!AppState.laptop.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
+    const combined = Utils.getLaptopRowsWithMissing();
+    if (!combined.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
     const sbuList = CONFIG.DEFAULT_SBU;
+    const countBy = (arr) => ({
+      total: arr.length,
+      aktif: arr.filter(l => l.Status === 'Aktif').length,
+      belum: arr.filter(l => l.Status === 'Belum Dikembalikan').length,
+      sudah: arr.filter(l => l.Status === 'Sudah Dikembalikan').length,
+      belumDapat: arr.filter(l => l.Status === 'Belum Dapat Laptop').length,
+      kosong: arr.filter(l => !l.Status).length
+    });
+
     const rows = sbuList.map(sbu => {
-      const entries = AppState.laptop.filter(l => l.SBU === sbu);
+      const c = countBy(combined.filter(l => l.SBU === sbu));
       return {
-        'SBU': sbu, 'Total Laptop': entries.length,
-        'Aktif': entries.filter(l => l.Status === 'Aktif').length,
-        'Belum Dikembalikan': entries.filter(l => l.Status === 'Belum Dikembalikan').length,
-        'Sudah Dikembalikan': entries.filter(l => l.Status === 'Sudah Dikembalikan').length,
-        'Belum Diisi Status': entries.filter(l => !l.Status).length
+        'SBU': sbu, 'Total': c.total, 'Aktif': c.aktif, 'Belum Dikembalikan': c.belum,
+        'Sudah Dikembalikan': c.sudah, 'Belum Dapat Laptop': c.belumDapat, 'Belum Diisi Status': c.kosong
       };
     });
+
+    const jabatanRows = [];
+    sbuList.forEach(sbu => {
+      const byJabatan = {};
+      combined.filter(l => l.SBU === sbu).forEach(e => {
+        const jab = e.Jabatan || 'Tidak Diketahui';
+        (byJabatan[jab] = byJabatan[jab] || []).push(e);
+      });
+      Object.keys(byJabatan).sort().forEach(jab => {
+        const c = countBy(byJabatan[jab]);
+        jabatanRows.push({
+          'SBU': sbu, 'Jabatan': jab, 'Total': c.total, 'Aktif': c.aktif, 'Belum Dikembalikan': c.belum,
+          'Sudah Dikembalikan': c.sudah, 'Belum Dapat Laptop': c.belumDapat, 'Belum Diisi Status': c.kosong
+        });
+      });
+    });
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Dashboard Laptop');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Per SBU');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(jabatanRows), 'Per SBU & Jabatan');
     XLSX.writeFile(wb, `dashboard-laptop-${Utils.getTodayDate()}.xlsx`);
     Utils.toast('✅ Excel berhasil diexport!');
   },
@@ -3596,11 +3709,10 @@ window.changeLemburPageSize     = () => Handlers.changeLemburPageSize();      //
 window.exportLemburExcel        = () => Handlers.exportLemburExcel();         // ✅ BARU
 window.exportDashboardNonPOExcel= () => Handlers.exportDashboardNonPOExcel(); // ✅ BARU
 window.openModalLembur          = (id) => Handlers.openLemburModal(id);      // ✅ BARU
-window.openModalLaptop          = (id) => Handlers.openLaptopModal(id);      // ✅ BARU
+window.openModalLaptop          = (id, prefillNIP) => Handlers.openLaptopModal(id, prefillNIP); // ✅ DIUBAH
 window.resetLaptopPageAndRender = () => Handlers.resetLaptopPageAndRender(); // ✅ BARU
 window.changeLaptopPageSize     = () => Handlers.changeLaptopPageSize();     // ✅ BARU
 window.exportLaptopExcel        = () => Handlers.exportLaptopExcel();        // ✅ BARU
-window.toggleSidebar            = (force) => Handlers.toggleSidebar(force);  // ✅ RESPONSIVE
 
 // Initialize application
 ThemeService.init();
