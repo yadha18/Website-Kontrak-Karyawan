@@ -30,7 +30,8 @@ const CONFIG = {
     'BALI & NUSA TENGGARA', 'PUSAT'
   ],
   // ✅ BARU: Jabatan yang dikecualikan dari Monitoring Pengadaan Laptop (tidak dihitung sama sekali)
-  JABATAN_LAPTOP_EXCLUDED: ['ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2'],
+  // ✅ DIUBAH: Account Executive Grade 1 & 2 dimunculkan kembali ke Monitoring Laptop (tidak dikecualikan lagi)
+  JABATAN_LAPTOP_EXCLUDED: [],
   // ✅ BARU: Daftar opsi dropdown Grade karyawan (diurutkan otomatis oleh Utils.sortGradeList saat dipakai)
   DEFAULT_GRADE: [
     'OFFICER GRADE-1', 'OFFICER GRADE-8',
@@ -227,7 +228,7 @@ const Models = {
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
       NIK:           String(data.NIK || '').trim(),                          // ✅ BARU
-      Grade:         Utils.resolveGrade(String(data.Grade || '').trim()),      // ✅ DIUBAH: konsisten dengan opsi dropdown Grade
+      Grade:         String(data.Grade || '').trim().toUpperCase(),          // ✅ BARU
       Jabatan:       Utils.resolveJabatan(String(data.Jabatan || '').trim()),
       SBU:           Utils.resolveSBU(String(data.SBU || '').trim()),
       GajiPokok:     Utils.parseNominal(data.GajiPokok),       // ✅ BARU
@@ -453,29 +454,6 @@ const Utils = {
     return upper;
   },
 
-  // ✅ BARU: Resolve nilai Grade karyawan ke salah satu opsi resmi di CONFIG.DEFAULT_GRADE.
-  // Menoleransi variasi penulisan spasi/tanda hubung/underscore (mis. "Officer Grade 1",
-  // "OFFICER_GRADE_1" dianggap sama dengan "OFFICER GRADE-1"). Kalau tidak ada yang cocok
-  // sama sekali, nilai asli (uppercase) tetap dikembalikan supaya data lama tidak hilang —
-  // tinggal dipilih manual dari dropdown untuk dikoreksi.
-  resolveGrade(raw) {
-    if (!raw) return raw;
-    const upper = String(raw).trim().toUpperCase();
-
-    // 1. Exact match ke daftar Grade resmi — langsung kembalikan
-    const exactCanonical = CONFIG.DEFAULT_GRADE.find(g => g === upper);
-    if (exactCanonical) return exactCanonical;
-
-    // 2. Cocokkan setelah menghilangkan spasi/tanda hubung/underscore
-    const normalize = s => s.replace(/[^A-Z0-9]/g, '');
-    const inputKey = normalize(upper);
-    const looseMatch = CONFIG.DEFAULT_GRADE.find(g => normalize(g) === inputKey);
-    if (looseMatch) return looseMatch;
-
-    // 3. Tidak cocok — kembalikan nilai asli (uppercase)
-    return upper;
-  },
-
   // ✅ BARU: Normalisasi teks status kepegawaian dari Excel ke salah satu nilai baku
   // Menangani variasi penulisan umum (huruf besar/kecil, sinonim) — fallback ke 'Aktif' jika kosong/tidak dikenali
   normalizeStatus(raw) {
@@ -684,6 +662,29 @@ const Utils = {
       if (nA !== nB) return nA - nB;
       return String(a).localeCompare(String(b));
     });
+  },
+  // ✅ BARU: Cocokkan Grade lama (teks bebas, mis. "G1", "Staff Marketing 23") ke opsi Grade baku terbaru,
+  // berdasarkan angka Grade + kata kunci kategori (OFFICER/MARKETING/SALES) dari teks Grade itu sendiri
+  // atau dari Jabatan karyawan (kalau kategori tidak tersebut eksplisit di teks Grade lama).
+  matchGradeToStandard(oldGradeText, jabatanText) {
+    const raw = String(oldGradeText || '').toUpperCase();
+    if (!raw) return null;
+    // Kalau sudah persis salah satu opsi baku, tidak perlu diubah
+    if (CONFIG.DEFAULT_GRADE.includes(raw)) return raw;
+
+    const numMatch = raw.match(/(\d+)/);
+    if (!numMatch) return null; // tidak ada angka grade yang bisa dikenali → lewati (perlu ditinjau manual)
+    const num = numMatch[1];
+
+    // Kandidat opsi baku dengan angka yang sama
+    const candidates = CONFIG.DEFAULT_GRADE.filter(g => (g.match(/-(\d+)$/) || [])[1] === num);
+    if (candidates.length === 0) return null;      // angka tidak ada padanannya di daftar baru
+    if (candidates.length === 1) return candidates[0]; // angka ini unik → langsung cocok
+
+    // Angka ambigu (lebih dari satu kategori punya angka sama) → cari kata kunci kategori
+    const jab = String(jabatanText || '').toUpperCase();
+    const findByKeyword = (text) => candidates.find(c => text.includes(c.split(' GRADE-')[0]));
+    return findByKeyword(raw) || findByKeyword(jab) || null;
   }
 };
 
@@ -704,8 +705,6 @@ const DB = {
       const data = await res.json();
 
       AppState.karyawan   = Array.isArray(data.karyawan) ? data.karyawan : [];
-      // ✅ BARU: Migrasi Grade lama supaya konsisten dengan opsi dropdown Grade (CONFIG.DEFAULT_GRADE)
-      AppState.karyawan.forEach(k => { if (k.Grade) k.Grade = Utils.resolveGrade(k.Grade); });
       AppState.log        = Array.isArray(data.log) ? data.log : [];
       AppState.jabatan     = Array.isArray(data.jabatan) && data.jabatan.length
         ? data.jabatan
@@ -1218,17 +1217,29 @@ const LaptopService = {
 
   // ✅ DIUBAH: NIP tidak lagi wajib — kalau NIP kosong, kolom Nama Pengguna di Excel wajib diisi
   // supaya identitas peminjam tetap jelas.
+  // ✅ BARU: tambahan validasi Serial Number duplikat & Jabatan yang dikecualikan dari pengadaan laptop.
   classifyUploadRows(rows) {
+    const seenSerial = new Set(); // deteksi duplikat SN di dalam file yang sama
+    const existingSerial = new Set(AppState.laptop.map(l => String(l.SerialNumber || '').trim().toLowerCase()).filter(Boolean));
+    const excluded = CONFIG.JABATAN_LAPTOP_EXCLUDED || [];
+
     return rows.map(raw => {
       const nip = String(raw.NIP || '').trim();
       const namaPengguna = String(raw.NamaPengguna || '').trim();
       const namaPerangkat = String(raw.NamaPerangkat || '').trim();
       const serial = String(raw.SerialNumber || '').trim();
+      const serialKey = serial.toLowerCase();
+      const emp = nip ? Utils.findKaryawanByNIP(nip) : null;
+
       let status;
       if (!nip && !namaPengguna) status = 'invalid_identitas';
       else if (!namaPerangkat) status = 'invalid_perangkat';
       else if (!serial) status = 'invalid_serial';
+      else if (emp && excluded.includes(emp.Jabatan)) status = 'invalid_jabatan_excluded'; // ✅ BARU
+      else if (existingSerial.has(serialKey) || seenSerial.has(serialKey)) status = 'invalid_serial_duplicate'; // ✅ BARU
       else status = 'new';
+
+      if (status === 'new') seenSerial.add(serialKey);
       return { ...raw, __uploadStatus: status };
     });
   },
@@ -3467,6 +3478,32 @@ const Handlers = {
 
     const editId = AppState.modals.laptopEditId;
     const existing = (editId !== null && editId !== undefined) ? AppState.laptop.find(l => l.id === editId) : null;
+
+    // ✅ BARU: Validasi Serial Number tidak boleh duplikat dengan data laptop lain
+    const dupSerial = AppState.laptop.find(l =>
+      l.id !== editId && String(l.SerialNumber || '').trim().toLowerCase() === serial.toLowerCase()
+    );
+    if (dupSerial) {
+      return Utils.toast(`❌ Serial Number "${serial}" sudah dipakai oleh laptop milik ${dupSerial.NamaPengguna || dupSerial.NIP || '(tanpa nama)'}!`);
+    }
+
+    // ✅ BARU: Validasi Jabatan yang dikecualikan dari pengadaan laptop (mis. Account Executive Grade 1 & 2)
+    if (nip) {
+      const emp = Utils.findKaryawanByNIP(nip);
+      if (emp && (CONFIG.JABATAN_LAPTOP_EXCLUDED || []).includes(emp.Jabatan)) {
+        return Utils.toast(`❌ Jabatan "${emp.Jabatan}" dikecualikan dari pengadaan laptop, tidak bisa ditambahkan/diedit.`);
+      }
+    }
+
+    // ✅ BARU: Validasi 1 karyawan tidak boleh punya 2 laptop berstatus "Aktif" di saat bersamaan
+    if (nip && status === 'Aktif') {
+      const dupAktif = AppState.laptop.find(l =>
+        l.id !== editId && String(l.NIP || '').trim() === nip && l.Status === 'Aktif'
+      );
+      if (dupAktif) {
+        return Utils.toast(`❌ ${namaPengguna} sudah memiliki laptop aktif (${dupAktif.NamaPerangkat} · SN: ${dupAktif.SerialNumber}). Ubah status laptop lama terlebih dahulu.`);
+      }
+    }
     const enriched = {
       NIP: nip, NamaPengguna: namaPengguna, SBU: sbu,
       NamaPerangkat: namaPerangkat, PA: pa, SerialNumber: serial, Status: status,
