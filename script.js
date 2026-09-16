@@ -210,7 +210,7 @@ const CONFIG = {
   STATUS_LAPTOP_OPTIONS: ['Aktif', 'Belum Dikembalikan', 'Sudah Dikembalikan'],
   // ✅ BARU: Opsi untuk dropdown FILTER tabel saja (bukan status yang bisa dipilih saat edit laptop) —
   // "Belum Dapat Laptop" adalah status virtual/hasil hitung, bukan status asli yang tersimpan.
-  get STATUS_LAPTOP_FILTER_OPTIONS() { return [...this.STATUS_LAPTOP_OPTIONS, 'Belum Dapat Laptop']; },
+  get STATUS_LAPTOP_FILTER_OPTIONS() { return [...this.STATUS_LAPTOP_OPTIONS, 'Belum Dapat Laptop', 'Tidak Dapat Laptop']; }, // ✅ DIUBAH
 
   // ✅ BARU: Nilai default PJTK & No. SP2K — dipakai kalau belum ada data karyawan sama sekali untuk
   // dijadikan acuan "nilai paling sering dipakai" (supaya tidak dibiarkan kosong).
@@ -2157,7 +2157,7 @@ const UI = {
     const startIdx = (laptopPagination.page - 1) * laptopPagination.size;
     const paginated = filtered.slice(startIdx, startIdx + laptopPagination.size);
 
-    const statusPill = { 'Aktif': 'pill-green', 'Belum Dikembalikan': 'pill-red', 'Sudah Dikembalikan': 'pill-blue', 'Belum Dapat Laptop': 'pill-gray' };
+    const statusPill = { 'Aktif': 'pill-green', 'Belum Dikembalikan': 'pill-red', 'Sudah Dikembalikan': 'pill-blue', 'Belum Dapat Laptop': 'pill-gray', 'Tidak Dapat Laptop': 'pill-gray' }; // ✅ DIUBAH
 
     tbody.innerHTML = paginated.map((l, i) => {
       const suggestion = Utils.suggestStatusLaptop(l.NIP, !!l.BuktiBA);
