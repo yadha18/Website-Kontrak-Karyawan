@@ -2144,7 +2144,7 @@ const UI = {
     if (!tbody) return;
 
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-icon">💻</div><h3>Tidak ada data</h3></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12"><div class="empty"><div class="empty-icon">💻</div><h3>Tidak ada data</h3></div></td></tr>`;
       if (pageContainer) pageContainer.style.display = 'none';
       return;
     }
@@ -2162,6 +2162,7 @@ const UI = {
     tbody.innerHTML = paginated.map((l, i) => {
       const suggestion = Utils.suggestStatusLaptop(l.NIP, !!l.BuktiBA);
       const mismatch = !l.__virtual && l.Status && suggestion !== l.Status;
+      const empGrade = (Utils.findKaryawanByNIP(l.NIP) || {}).Grade || ''; // ✅ BARU: Grade dicocokkan lewat NIP
       return `
       <tr${l.__virtual ? ' style="opacity:.75"' : ''}>
         <td style="white-space:nowrap">
@@ -2175,6 +2176,8 @@ const UI = {
         <td>${l.NamaPerangkat || '—'}</td>
         <td>${l.PA || '—'}</td>
         <td${l.NIP ? ` style="font-weight:500;color:var(--accent2);cursor:pointer;" onclick="Handlers.openLaptopDetailModal('${l.NIP}')" title="Lihat detail peminjaman"` : ''}>${l.NamaPengguna || '—'}</td>
+        <td style="font-size:12px;">${l.Jabatan || '—'}</td>
+        <td>${empGrade ? `<span class="pill pill-purple">${empGrade}</span>` : '—'}</td>
         <td class="mono">${l.SerialNumber || '—'}</td>
         <td>${l.SBU || '—'}</td>
         <td>
@@ -3731,7 +3734,8 @@ const Handlers = {
     if (!combined.length) return Utils.toast('❌ Tidak ada data untuk diexport!');
     const rows = combined.map((l, i) => ({
       'No': i + 1, 'NIP': l.NIP, 'Nama Perangkat': l.NamaPerangkat, 'PA': l.PA, 'Nama Pengguna': l.NamaPengguna,
-      'Serial Number': l.SerialNumber, 'Regional (SBU)': l.SBU, 'Jabatan': l.Jabatan || '', 'Status Laptop': l.Status || '',
+      'Jabatan': l.Jabatan || '', 'Grade': (Utils.findKaryawanByNIP(l.NIP) || {}).Grade || '', // ✅ BARU
+      'Serial Number': l.SerialNumber, 'Regional (SBU)': l.SBU, 'Status Laptop': l.Status || '',
       'Bukti Berita Acara': l.BuktiBA ? 'Ada' : 'Belum Ada'
     }));
     const wb = XLSX.utils.book_new();
