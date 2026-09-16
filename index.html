@@ -87,6 +87,7 @@
     <div class="nav-label">Monitoring Pengadaan Laptop</div>
     <button class="nav-item" onclick="navigate('dashboard-laptop')"><span class="icon">💻</span> Dashboard Laptop</button>
     <button class="nav-item" onclick="navigate('laptop')"><span class="icon">🧾</span> Tabel Monitoring Laptop</button>
+    <button class="nav-item" onclick="navigate('sbu-grade')"><span class="icon">📐</span> Kombinasi SBU & Grade</button>
 
     <!-- <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button> -->
     <div class="nav-label">Pengaturan</div>
@@ -405,6 +406,22 @@
       </div>
     </div>
 
+    <!-- ✅ BARU: Kombinasi SBU & Grade — referensi Harga Satuan & Gaji Pokok -->
+    <div class="page" id="page-sbu-grade">
+      <div class="page-header">
+        <h1>📐 Kombinasi SBU & Grade</h1>
+        <p>Referensi Harga Satuan &amp; Gaji Pokok untuk setiap kombinasi SBU dan Grade.</p>
+      </div>
+      <div class="card">
+        <div class="search-bar">
+          <input type="text" id="searchSbuGrade" placeholder="🔍  Cari SBU atau Grade..." oninput="UI.renderSbuGrade()">
+          <select id="filterSbuGradeSBU" onchange="UI.renderSbuGrade()"><option value="">Semua SBU</option></select>
+          <select id="filterSbuGradeGrade" onchange="UI.renderSbuGrade()"><option value="">Semua Grade</option></select>
+        </div>
+        <div id="sbu-grade-table"></div>
+      </div>
+    </div>
+
     <!-- ✅ BARU: Tabel Monitoring Pengadaan Laptop -->
     <div class="page" id="page-laptop">
       <div class="page-header">
@@ -540,7 +557,7 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Grade</label>
-        <select class="form-control" id="editGrade" onchange="Handlers.updateGajiHargaPreview()"><option value="">Pilih Grade</option></select>
+        <select class="form-control" id="editGrade"><option value="">Pilih Grade</option></select>
       </div>
     </div>
 
@@ -551,22 +568,21 @@
       </div>
       <div class="form-group">
         <label class="form-label">SBU</label>
-        <select class="form-control" id="editSBU" onchange="Handlers.updateGajiHargaPreview()"></select>
+        <select class="form-control" id="editSBU"></select>
       </div>
     </div>
 
-    <!-- ✅ DIUBAH: Gaji Pokok & Harga Satuan sekarang OTOMATIS dari tabel resmi (SBU + Grade) — tidak bisa diedit manual -->
+    <!-- ✅ BARU: Gaji Pokok, Harga Satuan, PJTK, No. SP2K, Nama TL, Sub Bidang (ditempatkan setelah SBU) -->
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Gaji Pokok <span style="color:var(--text2);font-weight:400;">(otomatis)</span></label>
-        <input type="text" class="form-control" id="editGajiPokok" disabled style="opacity:.75;cursor:not-allowed;">
+        <label class="form-label">Gaji Pokok</label>
+        <input type="number" min="0" class="form-control" id="editGajiPokok" placeholder="cth: 5000000">
       </div>
       <div class="form-group">
-        <label class="form-label">Harga Satuan <span style="color:var(--text2);font-weight:400;">(otomatis)</span></label>
-        <input type="text" class="form-control" id="editHargaSatuan" disabled style="opacity:.75;cursor:not-allowed;">
+        <label class="form-label">Harga Satuan</label>
+        <input type="number" min="0" class="form-control" id="editHargaSatuan" placeholder="cth: 150000">
       </div>
     </div>
-    <div id="editGajiHargaNote" class="info-note" style="display:none;"></div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">PJTK</label>

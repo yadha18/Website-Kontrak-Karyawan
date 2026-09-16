@@ -30,7 +30,9 @@ const CONFIG = {
     'BALI & NUSA TENGGARA', 'PUSAT'
   ],
   // ✅ BARU: Jabatan yang dikecualikan dari Monitoring Pengadaan Laptop (tidak dihitung sama sekali)
-  JABATAN_LAPTOP_EXCLUDED: [],
+  // ✅ DIUBAH: Jabatan ini bukan lagi "dikecualikan total" dari monitoring — tetap muncul,
+  // tapi digolongkan Status "Tidak Dapat Laptop" (lihat Utils.getLaptopRowsWithMissing)
+  JABATAN_LAPTOP_EXCLUDED: ['ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2'],
   // ✅ BARU: Daftar opsi dropdown Grade karyawan (diurutkan otomatis oleh Utils.sortGradeList saat dipakai)
   DEFAULT_GRADE: [
     'OFFICER GRADE-1', 'OFFICER GRADE-8',
@@ -39,73 +41,52 @@ const CONFIG = {
     'MARKETING GRADE-29', 'MARKETING GRADE-31', 'MARKETING GRADE-33', 'MARKETING GRADE-35',
     'SALES GRADE-1', 'SALES GRADE-2'
   ],
-  // ✅ BARU: Tabel Gaji Pokok & Harga Satuan default per kombinasi SBU + Grade (sumber: file harga resmi)
-  GAJI_HARGA_TABLE: {
-    'SUMATERA BAGIAN UTARA': {
-      'OFFICER GRADE-1': { gajiPokok: 4379000, hargaSatuan: 5978000 },
-      'MARKETING GRADE-23': { gajiPokok: 6287000, hargaSatuan: 8724000 },
-      'SALES GRADE-1': { gajiPokok: 4552000, hargaSatuan: 6514000 },
-      'SALES GRADE-2': { gajiPokok: 4769000, hargaSatuan: 6784000 },
-    },
-    'SUMATERA BAGIAN TENGAH': {
-      'OFFICER GRADE-1': { gajiPokok: 4039000, hargaSatuan: 5540000 },
-      'MARKETING GRADE-29': { gajiPokok: 6278000, hargaSatuan: 8713000 },
-      'SALES GRADE-1': { gajiPokok: 4199000, hargaSatuan: 6057000 },
-      'SALES GRADE-2': { gajiPokok: 4398000, hargaSatuan: 6322000 },
-    },
-    'SUMATERA BAGIAN SELATAN': {
-      'OFFICER GRADE-1': { gajiPokok: 4235000, hargaSatuan: 5799000 },
-      'MARKETING GRADE-25': { gajiPokok: 6248000, hargaSatuan: 8675000 },
-      'SALES GRADE-1': { gajiPokok: 4403000, hargaSatuan: 6328000 },
-      'SALES GRADE-2': { gajiPokok: 4613000, hargaSatuan: 6590000 },
-    },
-    'JAWA BAGIAN BARAT': {
-      'OFFICER GRADE-1': { gajiPokok: 4786000, hargaSatuan: 6501000 },
-      'MARKETING GRADE-16': { gajiPokok: 6207000, hargaSatuan: 8624000 },
-      'SALES GRADE-1': { gajiPokok: 4975000, hargaSatuan: 7060000 },
-      'SALES GRADE-2': { gajiPokok: 5212000, hargaSatuan: 7357000 },
-    },
-    'JAKARTA & BANTEN': {
-      'OFFICER GRADE-1': { gajiPokok: 5788000, hargaSatuan: 7794000 },
-      'MARKETING GRADE-9': { gajiPokok: 6704000, hargaSatuan: 9297000 },
-      'SALES GRADE-1': { gajiPokok: 6017000, hargaSatuan: 8386000 },
-      'SALES GRADE-2': { gajiPokok: 6303000, hargaSatuan: 8744000 },
-    },
-    'PUSAT': {
-      'OFFICER GRADE-1': { gajiPokok: 5788000, hargaSatuan: 7794000 },
-      'OFFICER GRADE-8': { gajiPokok: 6590000, hargaSatuan: 8823000 },
-    },
-    'JAWA BAGIAN TENGAH': {
-      'OFFICER GRADE-1': { gajiPokok: 3739000, hargaSatuan: 5154000 },
-      'MARKETING GRADE-35': { gajiPokok: 6256000, hargaSatuan: 8685000 },
-      'SALES GRADE-1': { gajiPokok: 3887000, hargaSatuan: 5654000 },
-      'SALES GRADE-2': { gajiPokok: 4072000, hargaSatuan: 5900000 },
-    },
-    'JAWA BAGIAN TIMUR': {
-      'OFFICER GRADE-1': { gajiPokok: 5342000, hargaSatuan: 7215000 },
-      'MARKETING GRADE-10': { gajiPokok: 6294000, hargaSatuan: 8733000 },
-      'SALES GRADE-1': { gajiPokok: 5554000, hargaSatuan: 7805000 },
-      'SALES GRADE-2': { gajiPokok: 5818000, hargaSatuan: 8136000 },
-    },
-    'KALIMANTAN': {
-      'OFFICER GRADE-1': { gajiPokok: 3896000, hargaSatuan: 5363000 },
-      'MARKETING GRADE-31': { gajiPokok: 6210000, hargaSatuan: 8628000 },
-      'SALES GRADE-1': { gajiPokok: 4050000, hargaSatuan: 5872000 },
-      'SALES GRADE-2': { gajiPokok: 4243000, hargaSatuan: 6129000 },
-    },
-    'BALI & NUSA TENGGARA': {
-      'OFFICER GRADE-1': { gajiPokok: 3829000, hargaSatuan: 5266000 },
-      'MARKETING GRADE-33': { gajiPokok: 6256000, hargaSatuan: 8685000 },
-      'SALES GRADE-1': { gajiPokok: 3981000, hargaSatuan: 5786000 },
-      'SALES GRADE-2': { gajiPokok: 4171000, hargaSatuan: 6022000 },
-    },
-    'SULAWESI & INDONESIA TIMUR': {
-      'OFFICER GRADE-1': { gajiPokok: 4190000, hargaSatuan: 5744000 },
-      'MARKETING GRADE-26': { gajiPokok: 6264000, hargaSatuan: 8695000 },
-      'SALES GRADE-1': { gajiPokok: 4356000, hargaSatuan: 6269000 },
-      'SALES GRADE-2': { gajiPokok: 4563000, hargaSatuan: 6528000 },
-    },
-  },
+  // ✅ BARU: Referensi kombinasi SBU & Grade beserta Harga Satuan & Gaji Pokok
+  // (sumber: Harga_Fix_Jabatan_dan_SBU.xlsx)
+  HARGA_SBU_GRADE: [
+    { SBU: 'SUMATERA BAGIAN UTARA', Grade: 'OFFICER GRADE-1', HargaSatuan: 5978000, GajiPokok: 4379000 },
+    { SBU: 'SUMATERA BAGIAN TENGAH', Grade: 'OFFICER GRADE-1', HargaSatuan: 5540000, GajiPokok: 4039000 },
+    { SBU: 'SUMATERA BAGIAN SELATAN', Grade: 'OFFICER GRADE-1', HargaSatuan: 5799000, GajiPokok: 4235000 },
+    { SBU: 'JAWA BAGIAN BARAT', Grade: 'OFFICER GRADE-1', HargaSatuan: 6501000, GajiPokok: 4786000 },
+    { SBU: 'JAKARTA & BANTEN', Grade: 'OFFICER GRADE-1', HargaSatuan: 7794000, GajiPokok: 5788000 },
+    { SBU: 'PUSAT', Grade: 'OFFICER GRADE-1', HargaSatuan: 7794000, GajiPokok: 5788000 },
+    { SBU: 'PUSAT', Grade: 'OFFICER GRADE-8', HargaSatuan: 8823000, GajiPokok: 6590000 },
+    { SBU: 'JAWA BAGIAN TENGAH', Grade: 'OFFICER GRADE-1', HargaSatuan: 5154000, GajiPokok: 3739000 },
+    { SBU: 'JAWA BAGIAN TIMUR', Grade: 'OFFICER GRADE-1', HargaSatuan: 7215000, GajiPokok: 5342000 },
+    { SBU: 'KALIMANTAN', Grade: 'OFFICER GRADE-1', HargaSatuan: 5363000, GajiPokok: 3896000 },
+    { SBU: 'BALI & NUSA TENGGARA', Grade: 'OFFICER GRADE-1', HargaSatuan: 5266000, GajiPokok: 3829000 },
+    { SBU: 'SULAWESI & INDONESIA TIMUR', Grade: 'OFFICER GRADE-1', HargaSatuan: 5744000, GajiPokok: 4190000 },
+    { SBU: 'SUMATERA BAGIAN UTARA', Grade: 'MARKETING GRADE-23', HargaSatuan: 8724000, GajiPokok: 6287000 },
+    { SBU: 'SUMATERA BAGIAN TENGAH', Grade: 'MARKETING GRADE-29', HargaSatuan: 8713000, GajiPokok: 6278000 },
+    { SBU: 'SUMATERA BAGIAN SELATAN', Grade: 'MARKETING GRADE-25', HargaSatuan: 8675000, GajiPokok: 6248000 },
+    { SBU: 'JAWA BAGIAN BARAT', Grade: 'MARKETING GRADE-16', HargaSatuan: 8624000, GajiPokok: 6207000 },
+    { SBU: 'JAKARTA & BANTEN', Grade: 'MARKETING GRADE-9', HargaSatuan: 9297000, GajiPokok: 6704000 },
+    { SBU: 'JAWA BAGIAN TENGAH', Grade: 'MARKETING GRADE-35', HargaSatuan: 8685000, GajiPokok: 6256000 },
+    { SBU: 'JAWA BAGIAN TIMUR', Grade: 'MARKETING GRADE-10', HargaSatuan: 8733000, GajiPokok: 6294000 },
+    { SBU: 'KALIMANTAN', Grade: 'MARKETING GRADE-31', HargaSatuan: 8628000, GajiPokok: 6210000 },
+    { SBU: 'BALI & NUSA TENGGARA', Grade: 'MARKETING GRADE-33', HargaSatuan: 8685000, GajiPokok: 6256000 },
+    { SBU: 'SULAWESI & INDONESIA TIMUR', Grade: 'MARKETING GRADE-26', HargaSatuan: 8695000, GajiPokok: 6264000 },
+    { SBU: 'SUMATERA BAGIAN UTARA', Grade: 'SALES GRADE-1', HargaSatuan: 6514000, GajiPokok: 4552000 },
+    { SBU: 'SUMATERA BAGIAN UTARA', Grade: 'SALES GRADE-2', HargaSatuan: 6784000, GajiPokok: 4769000 },
+    { SBU: 'SUMATERA BAGIAN TENGAH', Grade: 'SALES GRADE-1', HargaSatuan: 6057000, GajiPokok: 4199000 },
+    { SBU: 'SUMATERA BAGIAN TENGAH', Grade: 'SALES GRADE-2', HargaSatuan: 6322000, GajiPokok: 4398000 },
+    { SBU: 'SUMATERA BAGIAN SELATAN', Grade: 'SALES GRADE-1', HargaSatuan: 6328000, GajiPokok: 4403000 },
+    { SBU: 'SUMATERA BAGIAN SELATAN', Grade: 'SALES GRADE-2', HargaSatuan: 6590000, GajiPokok: 4613000 },
+    { SBU: 'JAWA BAGIAN BARAT', Grade: 'SALES GRADE-1', HargaSatuan: 7060000, GajiPokok: 4975000 },
+    { SBU: 'JAWA BAGIAN BARAT', Grade: 'SALES GRADE-2', HargaSatuan: 7357000, GajiPokok: 5212000 },
+    { SBU: 'JAKARTA & BANTEN', Grade: 'SALES GRADE-1', HargaSatuan: 8386000, GajiPokok: 6017000 },
+    { SBU: 'JAKARTA & BANTEN', Grade: 'SALES GRADE-2', HargaSatuan: 8744000, GajiPokok: 6303000 },
+    { SBU: 'JAWA BAGIAN TENGAH', Grade: 'SALES GRADE-1', HargaSatuan: 5654000, GajiPokok: 3887000 },
+    { SBU: 'JAWA BAGIAN TENGAH', Grade: 'SALES GRADE-2', HargaSatuan: 5900000, GajiPokok: 4072000 },
+    { SBU: 'JAWA BAGIAN TIMUR', Grade: 'SALES GRADE-1', HargaSatuan: 7805000, GajiPokok: 5554000 },
+    { SBU: 'JAWA BAGIAN TIMUR', Grade: 'SALES GRADE-2', HargaSatuan: 8136000, GajiPokok: 5818000 },
+    { SBU: 'KALIMANTAN', Grade: 'SALES GRADE-1', HargaSatuan: 5872000, GajiPokok: 4050000 },
+    { SBU: 'KALIMANTAN', Grade: 'SALES GRADE-2', HargaSatuan: 6129000, GajiPokok: 4243000 },
+    { SBU: 'BALI & NUSA TENGGARA', Grade: 'SALES GRADE-1', HargaSatuan: 5786000, GajiPokok: 3981000 },
+    { SBU: 'BALI & NUSA TENGGARA', Grade: 'SALES GRADE-2', HargaSatuan: 6022000, GajiPokok: 4171000 },
+    { SBU: 'SULAWESI & INDONESIA TIMUR', Grade: 'SALES GRADE-1', HargaSatuan: 6269000, GajiPokok: 4356000 },
+    { SBU: 'SULAWESI & INDONESIA TIMUR', Grade: 'SALES GRADE-2', HargaSatuan: 6528000, GajiPokok: 4563000 }
+  ],
   // ✅ BARU: Daftar opsi dropdown BKO Jabatan
   DEFAULT_BKO_JABATAN: [
     'ACCOUNT EXECUTIVE GRADE 1', 'ACCOUNT EXECUTIVE GRADE 2', 'COLLECTION SBU',
@@ -289,22 +270,16 @@ const AppState = {
 // ─── 3. DATA MODELS (CONTROLLED STRUCTURE) ──────────────────────────────────
 const Models = {
   Karyawan(data = {}) {
-    const resolvedGrade = Utils.resolveGrade(String(data.Grade || '').trim());
-    const resolvedSBU = Utils.resolveSBU(String(data.SBU || '').trim());
-    // ✅ DIUBAH: Gaji Pokok & Harga Satuan SELALU dihitung otomatis dari tabel resmi berdasarkan
-    // SBU + Grade — input manual/upload untuk kedua kolom ini diabaikan sepenuhnya (tidak bisa diubah).
-    const gajiHarga = Utils.getGajiHargaDefault(resolvedSBU, resolvedGrade);
-
     return {
       id:            data.id || Utils.generateId(),
       NIP:           String(data.NIP || '').trim(),
       Nama:          String(data.Nama || '').trim(),
       NIK:           String(data.NIK || '').trim(),                          // ✅ BARU
-      Grade:         resolvedGrade,
+      Grade:         String(data.Grade || '').trim().toUpperCase(),          // ✅ BARU
       Jabatan:       Utils.resolveJabatan(String(data.Jabatan || '').trim()),
-      SBU:           resolvedSBU,
-      GajiPokok:     gajiHarga.gajiPokok,     // ✅ DIUBAH: otomatis dari tabel SBU+Grade
-      HargaSatuan:   gajiHarga.hargaSatuan,   // ✅ DIUBAH: otomatis dari tabel SBU+Grade
+      SBU:           Utils.resolveSBU(String(data.SBU || '').trim()),
+      GajiPokok:     Utils.parseNominal(data.GajiPokok),       // ✅ BARU
+      HargaSatuan:   Utils.parseNominal(data.HargaSatuan),     // ✅ BARU
       PJTK:          String(data.PJTK || '').trim(),           // ✅ BARU
       NoSP2K:        String(data.NoSP2K || '').trim(),         // ✅ BARU
       NamaTL:        String(data.NamaTL || '').trim(),         // ✅ BARU
@@ -526,37 +501,6 @@ const Utils = {
     return upper;
   },
 
-  // ✅ BARU: Resolve nilai Grade karyawan ke salah satu opsi resmi di CONFIG.DEFAULT_GRADE.
-  // Menoleransi variasi penulisan spasi/tanda hubung/underscore (mis. "Officer Grade 1",
-  // "OFFICER_GRADE_1" dianggap sama dengan "OFFICER GRADE-1"). Kalau tidak ada yang cocok
-  // sama sekali, nilai asli (uppercase) tetap dikembalikan supaya data lama tidak hilang —
-  // tinggal dipilih manual dari dropdown untuk dikoreksi.
-  resolveGrade(raw) {
-    if (!raw) return raw;
-    const upper = String(raw).trim().toUpperCase();
-
-    // 1. Exact match ke daftar Grade resmi — langsung kembalikan
-    const exactCanonical = CONFIG.DEFAULT_GRADE.find(g => g === upper);
-    if (exactCanonical) return exactCanonical;
-
-    // 2. Cocokkan setelah menghilangkan spasi/tanda hubung/underscore
-    const normalize = s => s.replace(/[^A-Z0-9]/g, '');
-    const inputKey = normalize(upper);
-    const looseMatch = CONFIG.DEFAULT_GRADE.find(g => normalize(g) === inputKey);
-    if (looseMatch) return looseMatch;
-
-    // 3. Tidak cocok — kembalikan nilai asli (uppercase)
-    return upper;
-  },
-
-  // ✅ BARU: Ambil Gaji Pokok & Harga Satuan default dari tabel resmi berdasarkan kombinasi SBU + Grade.
-  // Kalau kombinasinya tidak ada di tabel (mis. SBU "PUSAT" dengan Grade "SALES GRADE-1" yang memang
-  // tidak tersedia), kembalikan 0/0 — TIDAK ada nilai tebakan/default lain.
-  getGajiHargaDefault(sbu, grade) {
-    const row = (CONFIG.GAJI_HARGA_TABLE[sbu] || {})[grade];
-    return row ? { gajiPokok: row.gajiPokok, hargaSatuan: row.hargaSatuan } : { gajiPokok: 0, hargaSatuan: 0 };
-  },
-
   // ✅ BARU: Normalisasi teks status kepegawaian dari Excel ke salah satu nilai baku
   // Menangani variasi penulisan umum (huruf besar/kecil, sinonim) — fallback ke 'Aktif' jika kosong/tidak dikenali
   normalizeStatus(raw) {
@@ -705,25 +649,26 @@ const Utils = {
     return 'Aktif';
   },
 
-  // ✅ BARU: Gabungkan data Laptop asli + baris "virtual" untuk karyawan aktif yang belum tercatat
+  // ✅ DIUBAH: Gabungkan data Laptop asli + baris "virtual" untuk karyawan aktif yang belum tercatat
   // punya laptop sama sekali (selisih dari Data Karyawan, dicocokkan lewat NIP). Baris virtual diberi
-  // Status "Belum Dapat Laptop" dan Jabatan setiap baris (asli maupun virtual) ikut dilampirkan supaya
-  // bisa dipakai untuk breakdown per Jabatan di Dashboard Laptop.
+  // Status "Belum Dapat Laptop" — KECUALI untuk Jabatan yang memang tidak berhak dapat laptop
+  // (mis. Account Executive Grade 1 & 2), yang diberi Status "Tidak Dapat Laptop" supaya tetap terlihat
+  // di monitoring tapi tidak dihitung sebagai "menunggu pengadaan". Jabatan setiap baris (asli maupun
+  // virtual) ikut dilampirkan supaya bisa dipakai untuk breakdown per Jabatan di Dashboard Laptop.
   getLaptopRowsWithMissing() {
-    const excluded = CONFIG.JABATAN_LAPTOP_EXCLUDED || []; // ✅ BARU: AE Grade 1 & 2 tidak termasuk pengadaan laptop
-    const real = AppState.laptop
-      .map(l => ({
-        ...l,
-        Jabatan: (Utils.findKaryawanByNIP(l.NIP) || {}).Jabatan || ''
-      }))
-      .filter(l => !excluded.includes(l.Jabatan)); // ✅ BARU: kecualikan meski ada data laptop tercatat
+    const excluded = CONFIG.JABATAN_LAPTOP_EXCLUDED || []; // ✅ Jabatan yang tidak berhak dapat laptop
+    const real = AppState.laptop.map(l => ({
+      ...l,
+      Jabatan: (Utils.findKaryawanByNIP(l.NIP) || {}).Jabatan || ''
+    }));
     const nipWithLaptop = new Set(AppState.laptop.map(l => l.NIP).filter(Boolean));
     const missing = AppState.karyawan
-      .filter(k => k.Status !== 'Resign' && k.NIP && !nipWithLaptop.has(k.NIP) && !excluded.includes(k.Jabatan))
+      .filter(k => k.Status !== 'Resign' && k.NIP && !nipWithLaptop.has(k.NIP))
       .map(k => ({
         id: 'missing-' + k.id,
         NIP: k.NIP, NamaPerangkat: '', PA: '', NamaPengguna: k.Nama, SerialNumber: '',
-        SBU: k.SBU, Jabatan: k.Jabatan, Status: 'Belum Dapat Laptop',
+        SBU: k.SBU, Jabatan: k.Jabatan,
+        Status: excluded.includes(k.Jabatan) ? 'Tidak Dapat Laptop' : 'Belum Dapat Laptop', // ✅ BARU
         BuktiBA: null, BuktiBAFileName: null, __virtual: true
       }));
     return real.concat(missing);
@@ -765,6 +710,29 @@ const Utils = {
       if (nA !== nB) return nA - nB;
       return String(a).localeCompare(String(b));
     });
+  },
+  // ✅ BARU: Cocokkan Grade lama (teks bebas, mis. "G1", "Staff Marketing 23") ke opsi Grade baku terbaru,
+  // berdasarkan angka Grade + kata kunci kategori (OFFICER/MARKETING/SALES) dari teks Grade itu sendiri
+  // atau dari Jabatan karyawan (kalau kategori tidak tersebut eksplisit di teks Grade lama).
+  matchGradeToStandard(oldGradeText, jabatanText) {
+    const raw = String(oldGradeText || '').toUpperCase();
+    if (!raw) return null;
+    // Kalau sudah persis salah satu opsi baku, tidak perlu diubah
+    if (CONFIG.DEFAULT_GRADE.includes(raw)) return raw;
+
+    const numMatch = raw.match(/(\d+)/);
+    if (!numMatch) return null; // tidak ada angka grade yang bisa dikenali → lewati (perlu ditinjau manual)
+    const num = numMatch[1];
+
+    // Kandidat opsi baku dengan angka yang sama
+    const candidates = CONFIG.DEFAULT_GRADE.filter(g => (g.match(/-(\d+)$/) || [])[1] === num);
+    if (candidates.length === 0) return null;      // angka tidak ada padanannya di daftar baru
+    if (candidates.length === 1) return candidates[0]; // angka ini unik → langsung cocok
+
+    // Angka ambigu (lebih dari satu kategori punya angka sama) → cari kata kunci kategori
+    const jab = String(jabatanText || '').toUpperCase();
+    const findByKeyword = (text) => candidates.find(c => text.includes(c.split(' GRADE-')[0]));
+    return findByKeyword(raw) || findByKeyword(jab) || null;
   }
 };
 
@@ -785,8 +753,6 @@ const DB = {
       const data = await res.json();
 
       AppState.karyawan   = Array.isArray(data.karyawan) ? data.karyawan : [];
-      // ✅ BARU: Migrasi Grade lama supaya konsisten dengan opsi dropdown Grade (CONFIG.DEFAULT_GRADE)
-      AppState.karyawan.forEach(k => { if (k.Grade) k.Grade = Utils.resolveGrade(k.Grade); });
       AppState.log        = Array.isArray(data.log) ? data.log : [];
       AppState.jabatan     = Array.isArray(data.jabatan) && data.jabatan.length
         ? data.jabatan
@@ -1299,17 +1265,29 @@ const LaptopService = {
 
   // ✅ DIUBAH: NIP tidak lagi wajib — kalau NIP kosong, kolom Nama Pengguna di Excel wajib diisi
   // supaya identitas peminjam tetap jelas.
+  // ✅ BARU: tambahan validasi Serial Number duplikat & Jabatan yang dikecualikan dari pengadaan laptop.
   classifyUploadRows(rows) {
+    const seenSerial = new Set(); // deteksi duplikat SN di dalam file yang sama
+    const existingSerial = new Set(AppState.laptop.map(l => String(l.SerialNumber || '').trim().toLowerCase()).filter(Boolean));
+    const excluded = CONFIG.JABATAN_LAPTOP_EXCLUDED || [];
+
     return rows.map(raw => {
       const nip = String(raw.NIP || '').trim();
       const namaPengguna = String(raw.NamaPengguna || '').trim();
       const namaPerangkat = String(raw.NamaPerangkat || '').trim();
       const serial = String(raw.SerialNumber || '').trim();
+      const serialKey = serial.toLowerCase();
+      const emp = nip ? Utils.findKaryawanByNIP(nip) : null;
+
       let status;
       if (!nip && !namaPengguna) status = 'invalid_identitas';
       else if (!namaPerangkat) status = 'invalid_perangkat';
       else if (!serial) status = 'invalid_serial';
+      else if (emp && excluded.includes(emp.Jabatan)) status = 'invalid_jabatan_excluded'; // ✅ BARU
+      else if (existingSerial.has(serialKey) || seenSerial.has(serialKey)) status = 'invalid_serial_duplicate'; // ✅ BARU
       else status = 'new';
+
+      if (status === 'new') seenSerial.add(serialKey);
       return { ...raw, __uploadStatus: status };
     });
   },
@@ -1941,12 +1919,13 @@ const UI = {
       belum: arr.filter(l => l.Status === 'Belum Dikembalikan').length,
       sudah: arr.filter(l => l.Status === 'Sudah Dikembalikan').length,
       belumDapat: arr.filter(l => l.Status === 'Belum Dapat Laptop').length,
+      tidakDapat: arr.filter(l => l.Status === 'Tidak Dapat Laptop').length, // ✅ BARU: Jabatan yang tidak berhak (mis. AE Grade 1 & 2)
       kosong: arr.filter(l => !l.Status).length
     });
 
     const rows = sbuList.map(sbu => ({ sbu, entries: laptop.filter(l => l.SBU === sbu), ...countBy(laptop.filter(l => l.SBU === sbu)) }));
     const totals = countBy(laptop);
-    // ✅ BARU: Total laptop fisik (bukan virtual "Belum Dapat Laptop"), sudah dikurangi AE Grade 1 & 2
+    // ✅ Total laptop fisik (bukan baris virtual "Belum/Tidak Dapat Laptop")
     const totalLaptopFisik = laptop.filter(l => !l.__virtual).length;
 
     const elCard = document.getElementById('laptop-summary-card');
@@ -1956,12 +1935,13 @@ const UI = {
           <div class="card-title" style="margin:0;">💻 Ringkasan Status Laptop</div>
           <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardLaptopExcel()">⬇ Export Excel</button>
         </div>
-        <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);">
+        <div class="stat-grid" style="grid-template-columns:repeat(6,1fr);">
           <div class="stat-card"><div class="stat-label">Total Laptop</div><div class="stat-value accent">${totalLaptopFisik}</div></div>
           <div class="stat-card"><div class="stat-label">🟢 Aktif</div><div class="stat-value success">${totals.aktif}</div></div>
           <div class="stat-card"><div class="stat-label">🔴 Belum Dikembalikan</div><div class="stat-value danger">${totals.belum}</div></div>
           <div class="stat-card"><div class="stat-label">✅ Sudah Dikembalikan</div><div class="stat-value warning">${totals.sudah}</div></div>
           <div class="stat-card"><div class="stat-label">⛔ Belum Dapat Laptop</div><div class="stat-value" style="color:var(--text2)">${totals.belumDapat}</div></div>
+          <div class="stat-card"><div class="stat-label">🚫 Tidak Dapat Laptop</div><div class="stat-value" style="color:var(--text2)">${totals.tidakDapat}</div></div>
         </div>`;
     }
 
@@ -1972,7 +1952,7 @@ const UI = {
           <table>
             <thead><tr>
               <th></th><th>SBU</th><th>Total</th><th>🟢 Aktif</th><th>🔴 Belum Dikembalikan</th>
-              <th>✅ Sudah Dikembalikan</th><th>⛔ Belum Dapat Laptop</th><th>Belum Diisi Status</th>
+              <th>✅ Sudah Dikembalikan</th><th>⛔ Belum Dapat Laptop</th><th>🚫 Tidak Dapat Laptop</th><th>Belum Diisi Status</th>
             </tr></thead>
             ${rows.map(r => {
               const sbuId = 'sbu_' + r.sbu.replace(/[^a-zA-Z0-9]/g, '_');
@@ -1998,7 +1978,7 @@ const UI = {
                       <span>${e.NamaPengguna || '(tanpa nama)'}</span>
                       <span style="display:flex;align-items:center;gap:8px;">
                         <span class="mono" style="color:var(--text2);font-size:11px;">${e.NIP || '-'}</span>
-                        <span class="pill pill-${e.Status === 'Aktif' ? 'green' : e.Status === 'Belum Dikembalikan' ? 'red' : e.Status === 'Sudah Dikembalikan' ? 'yellow' : 'gray'}">${e.Status || 'Belum Diisi'}</span>
+                        <span class="pill pill-${e.Status === 'Aktif' ? 'green' : e.Status === 'Belum Dikembalikan' ? 'red' : e.Status === 'Sudah Dikembalikan' ? 'yellow' : e.Status === 'Tidak Dapat Laptop' ? 'gray' : e.Status === 'Belum Dapat Laptop' ? 'red' : 'gray'}">${e.Status || 'Belum Diisi'}</span>
                       </span>
                     </div>`).join('');
 
@@ -2013,11 +1993,12 @@ const UI = {
                     <td class="mono" style="text-align:center;">${c.belum}</td>
                     <td class="mono" style="text-align:center;">${c.sudah}</td>
                     <td class="mono" style="text-align:center;">${c.belumDapat}</td>
+                    <td class="mono" style="text-align:center;">${c.tidakDapat}</td>
                     <td class="mono" style="text-align:center;color:var(--text2);">${c.kosong}</td>
                   </tr>
                   ${jabOpen ? `
                   <tr class="slot-jabatan-detail-row">
-                    <td colspan="8" style="padding:0;">
+                    <td colspan="9" style="padding:0;">
                       <div class="slot-jabatan-employee-list">${namesList || `<div style="color:var(--text3);font-size:12px;padding:6px 2px;">Tidak ada karyawan.</div>`}</div>
                     </td>
                   </tr>` : ''}`;
@@ -2033,11 +2014,12 @@ const UI = {
                     <td class="mono" style="text-align:center;">${r.belum}</td>
                     <td class="mono" style="text-align:center;">${r.sudah}</td>
                     <td class="mono" style="text-align:center;">${r.belumDapat}</td>
+                    <td class="mono" style="text-align:center;">${r.tidakDapat}</td>
                     <td class="mono" style="text-align:center;color:var(--text2);">${r.kosong}</td>
                   </tr>
                 </tbody>
                 <tbody id="${sbuId}_detail" style="display:${sbuOpen ? '' : 'none'};">
-                  ${jabatanRows || `<tr><td></td><td colspan="7" style="color:var(--text2);font-size:12px;padding:8px 12px;">Tidak ada data di SBU ini</td></tr>`}
+                  ${jabatanRows || `<tr><td></td><td colspan="8" style="color:var(--text2);font-size:12px;padding:8px 12px;">Tidak ada data di SBU ini</td></tr>`}
                 </tbody>`;
             }).join('')}
           </table>
@@ -2045,6 +2027,70 @@ const UI = {
     }
 
     this.renderLaptopLog();
+  },
+
+  // ✅ BARU: Render halaman "Kombinasi SBU & Grade" — referensi Harga Satuan & Gaji Pokok per SBU+Grade
+  // (sumber data: Harga_Fix_Jabatan_dan_SBU.xlsx), dengan filter SBU/Grade dan pencarian.
+  renderSbuGrade() {
+    const elFilterSBU = document.getElementById('filterSbuGradeSBU');
+    const elFilterGrade = document.getElementById('filterSbuGradeGrade');
+    if (elFilterSBU && !elFilterSBU.dataset.filled) {
+      elFilterSBU.innerHTML = '<option value="">Semua SBU</option>' +
+        CONFIG.DEFAULT_SBU.map(s => `<option value="${s}">${s}</option>`).join('');
+      elFilterSBU.dataset.filled = '1';
+    }
+    if (elFilterGrade && !elFilterGrade.dataset.filled) {
+      elFilterGrade.innerHTML = '<option value="">Semua Grade</option>' +
+        Utils.sortGradeList(CONFIG.DEFAULT_GRADE).map(g => `<option value="${g}">${g}</option>`).join('');
+      elFilterGrade.dataset.filled = '1';
+    }
+
+    const searchVal = (document.getElementById('searchSbuGrade')?.value || '').toLowerCase();
+    const filterSBU = elFilterSBU?.value || '';
+    const filterGrade = elFilterGrade?.value || '';
+
+    let data = CONFIG.HARGA_SBU_GRADE.slice();
+    if (filterSBU) data = data.filter(d => d.SBU === filterSBU);
+    if (filterGrade) data = data.filter(d => d.Grade === filterGrade);
+    if (searchVal) data = data.filter(d => d.SBU.toLowerCase().includes(searchVal) || d.Grade.toLowerCase().includes(searchVal));
+
+    // Urutkan: Grade menaik (1 → terbesar) dulu, baru SBU abjad
+    data.sort((a, b) => {
+      const idxA = Utils.sortGradeList([a.Grade, b.Grade]).indexOf(a.Grade);
+      const gCompare = (() => {
+        const numA = parseInt((a.Grade.match(/-(\d+)$/) || [])[1], 10);
+        const numB = parseInt((b.Grade.match(/-(\d+)$/) || [])[1], 10);
+        if (numA !== numB) return numA - numB;
+        return a.Grade.localeCompare(b.Grade);
+      })();
+      if (gCompare !== 0) return gCompare;
+      return a.SBU.localeCompare(b.SBU);
+    });
+
+    const fmtRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+
+    const container = document.getElementById('sbu-grade-table');
+    if (!container) return;
+    if (!data.length) {
+      container.innerHTML = `<div class="empty"><div class="empty-icon">📐</div><h3>Tidak ada data</h3><p>Coba ubah filter atau kata kunci pencarian.</p></div>`;
+      return;
+    }
+    container.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>SBU</th><th>Grade</th><th>Harga Satuan</th><th>Gaji Pokok</th></tr></thead>
+          <tbody>
+            ${data.map(d => `
+              <tr>
+                <td style="font-weight:500;">${d.SBU}</td>
+                <td class="mono">${d.Grade}</td>
+                <td class="mono" style="text-align:right;">${fmtRp(d.HargaSatuan)}</td>
+                <td class="mono" style="text-align:right;">${fmtRp(d.GajiPokok)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;color:var(--text2);font-size:12px;">Menampilkan ${data.length} dari ${CONFIG.HARGA_SBU_GRADE.length} kombinasi SBU & Grade</div>`;
   },
 
   // ✅ BARU: Log Perubahan khusus Monitoring Laptop (terpisah dari log Karyawan & Lembur)
@@ -2230,7 +2276,8 @@ const Handlers = {
     const renders = {
       dashboard: 'renderDashboard', karyawan: 'renderKaryawanTable',
       pindah: 'renderPindahJabatan', jabatan: 'renderJabatanList',
-      'dashboard-laptop': 'renderDashboardLaptop', laptop: 'renderLaptopTable' // ✅ BARU
+      'dashboard-laptop': 'renderDashboardLaptop', laptop: 'renderLaptopTable', // ✅ BARU
+      'sbu-grade': 'renderSbuGrade' // ✅ BARU: Kombinasi SBU & Grade
     };
     if (renders[page]) UI[renders[page]]();
     if (page === 'upload') this.setUploadType(AppState.uploadDataType || 'karyawan'); // ✅ BARU
@@ -2309,9 +2356,8 @@ const Handlers = {
     if (desc) {
       if (AppState.uploadDataType === 'karyawan') {
         desc.innerHTML = `Kolom: NIP, Nama, NIK, Grade, Jabatan, SBU, Gaji Pokok, Harga Satuan, PJTK, No. SP2K, Nama TL, Sub Bidang, BKO Jabatan, BKO SBU, NIP Baru, Email, Email Korporat, Nama Akun ICRM, Tanggal Masuk, Tanggal Keluar, Ukuran Baju, Nomor Telpon, Status, Catatan Status.<br>
-           💰 Kolom <strong>Gaji Pokok</strong> &amp; <strong>Harga Satuan</strong> di file SELALU diabaikan — dihitung otomatis sistem dari Grade &amp; SBU.<br>
            💡 <strong>Sub Bidang</strong> akan tetap tersimpan meski belum ada di Daftar Sub Bidang — tambahkan lewat menu "Daftar Jabatan" agar muncul di dropdown.<br>
-           🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> NIP yang sudah terdaftar akan dilengkapi kolom kosongnya, bukan dilewati.`;
+           🔑 <strong>NIP diperlakukan sebagai Primary Key.</strong> NIP yang sudah terdaftar akan otomatis dilewati.`;
       } else if (AppState.uploadDataType === 'lembur') {
         desc.innerHTML = `Kolom: <strong>NIP, Nominal, Bulan, Tagihan</strong> (Bulan: "Januari"–"Desember" ${CONFIG.TAHUN_LEMBUR_LIST.join('/')}; Tagihan: "SPPD 1 2" atau "Lembur").<br>
            ℹ️ Nama, SBU, dan Jabatan otomatis diambil dari Data Karyawan berdasarkan NIP — cukup isi NIP di file Excel.`;
@@ -2394,8 +2440,7 @@ const Handlers = {
             <div class="stat-card"><div class="stat-label">⚠ Duplikat di Dalam File</div><div class="stat-value warning">${stats.duplicateInFile}</div></div>
             <div class="stat-card"><div class="stat-label">✕ NIP Kosong (tidak valid)</div><div class="stat-value danger">${stats.invalid}</div></div>
           </div>
-          <div class="info-note">ℹ️ NIP diperlakukan sebagai <strong>Primary Key</strong>. Baris <strong>Baru</strong> ditambahkan sebagai karyawan baru. Baris <strong>🔁 NIP Diperbarui</strong> (NIK-nya cocok dengan karyawan yang sudah ada, tapi NIP-nya beda) akan MENGGANTI NIP lama ke NIP baru pada karyawan yang sama, dan data Lembur/SPPD serta Monitoring Laptop miliknya ikut disesuaikan otomatis. Baris <strong>🧩 NIP Sudah Ada</strong> TIDAK menambah data baru maupun menimpa data yang sudah terisi — hanya kolom yang di data lama masih KOSONG yang akan diisi dari file ini.<br>
-          💰 Kolom <strong>Gaji Pokok</strong> &amp; <strong>Harga Satuan</strong> di file ini SELALU diabaikan — nilainya otomatis dihitung sistem dari tabel resmi berdasarkan Grade &amp; SBU.</div>`;
+          <div class="info-note">ℹ️ NIP diperlakukan sebagai <strong>Primary Key</strong>. Baris <strong>Baru</strong> ditambahkan sebagai karyawan baru. Baris <strong>🔁 NIP Diperbarui</strong> (NIK-nya cocok dengan karyawan yang sudah ada, tapi NIP-nya beda) akan MENGGANTI NIP lama ke NIP baru pada karyawan yang sama, dan data Lembur/SPPD serta Monitoring Laptop miliknya ikut disesuaikan otomatis. Baris <strong>🧩 NIP Sudah Ada</strong> TIDAK menambah data baru maupun menimpa data yang sudah terisi — hanya kolom yang di data lama masih KOSONG yang akan diisi dari file ini.</div>`;
       }
 
       document.getElementById('previewHead').innerHTML = '<th>Status</th>' + COLS.map(c => `<th>${c}</th>`).join('');
@@ -2774,7 +2819,8 @@ const Handlers = {
     document.getElementById('editGrade').value        = emp.Grade || '';                       // ✅ BARU
     document.getElementById('editJabatan').value      = emp.Jabatan;
     document.getElementById('editSBU').value          = emp.SBU;
-    this.updateGajiHargaPreview(); // ✅ DIUBAH: Gaji Pokok/Harga Satuan dihitung otomatis dari SBU+Grade
+    document.getElementById('editGajiPokok').value    = emp.GajiPokok || '';                   // ✅ BARU
+    document.getElementById('editHargaSatuan').value  = emp.HargaSatuan || '';                 // ✅ BARU
     document.getElementById('editPJTK').value         = emp.PJTK || (id ? '' : (Utils.getMostCommonValue('PJTK') || CONFIG.DEFAULT_PJTK));       // ✅ DIUBAH: fallback ke default
     document.getElementById('editNoSP2K').value       = emp.NoSP2K || (id ? '' : (Utils.getMostCommonValue('NoSP2K') || CONFIG.DEFAULT_NO_SP2K)); // ✅ DIUBAH: fallback ke default
     document.getElementById('editNamaTL').value       = emp.NamaTL || '';                      // ✅ BARU
@@ -2804,27 +2850,6 @@ const Handlers = {
   },
 
   // ✅ DIUBAH: saveEditData — nilai BKO diambil dari select, di-uppercase via Models.Karyawan
-  // ✅ BARU: Update tampilan Gaji Pokok & Harga Satuan (read-only) tiap kali Grade/SBU berubah di form,
-  // mengambil nilai dari tabel resmi CONFIG.GAJI_HARGA_TABLE — field ini tidak pernah diinput manual.
-  updateGajiHargaPreview() {
-    const sbu = document.getElementById('editSBU').value;
-    const grade = document.getElementById('editGrade').value;
-    const { gajiPokok, hargaSatuan } = Utils.getGajiHargaDefault(sbu, grade);
-    document.getElementById('editGajiPokok').value = Utils.formatRupiah(gajiPokok);
-    document.getElementById('editHargaSatuan').value = Utils.formatRupiah(hargaSatuan);
-
-    const note = document.getElementById('editGajiHargaNote');
-    if (!sbu || !grade) {
-      note.style.display = 'block';
-      note.textContent = 'ℹ️ Pilih Grade dan SBU untuk menghitung Gaji Pokok & Harga Satuan otomatis.';
-    } else if (gajiPokok === 0 && hargaSatuan === 0) {
-      note.style.display = 'block';
-      note.textContent = `⚠️ Kombinasi Grade "${grade}" dan SBU "${sbu}" belum ada di tabel harga resmi — nilai dikosongkan (0).`;
-    } else {
-      note.style.display = 'none';
-    }
-  },
-
   saveEditData() {
     const NIP  = document.getElementById('editNIP').value.trim();
     const Nama = document.getElementById('editNama').value.trim();
@@ -2843,8 +2868,8 @@ const Handlers = {
       Grade:         document.getElementById('editGrade').value,             // ✅ BARU
       Jabatan:       JabatanValue,
       SBU:           document.getElementById('editSBU').value,
-      // ✅ DIHAPUS: GajiPokok & HargaSatuan tidak lagi diambil dari form — selalu dihitung otomatis
-      // oleh Models.Karyawan dari tabel resmi berdasarkan SBU + Grade (lihat updateGajiHargaPreview()).
+      GajiPokok:     document.getElementById('editGajiPokok').value,          // ✅ BARU
+      HargaSatuan:   document.getElementById('editHargaSatuan').value,        // ✅ BARU
       PJTK:          document.getElementById('editPJTK').value,               // ✅ BARU
       NoSP2K:        document.getElementById('editNoSP2K').value,             // ✅ BARU
       NamaTL:        document.getElementById('editNamaTL').value,             // ✅ BARU
@@ -3570,6 +3595,32 @@ const Handlers = {
 
     const editId = AppState.modals.laptopEditId;
     const existing = (editId !== null && editId !== undefined) ? AppState.laptop.find(l => l.id === editId) : null;
+
+    // ✅ BARU: Validasi Serial Number tidak boleh duplikat dengan data laptop lain
+    const dupSerial = AppState.laptop.find(l =>
+      l.id !== editId && String(l.SerialNumber || '').trim().toLowerCase() === serial.toLowerCase()
+    );
+    if (dupSerial) {
+      return Utils.toast(`❌ Serial Number "${serial}" sudah dipakai oleh laptop milik ${dupSerial.NamaPengguna || dupSerial.NIP || '(tanpa nama)'}!`);
+    }
+
+    // ✅ BARU: Validasi Jabatan yang dikecualikan dari pengadaan laptop (mis. Account Executive Grade 1 & 2)
+    if (nip) {
+      const emp = Utils.findKaryawanByNIP(nip);
+      if (emp && (CONFIG.JABATAN_LAPTOP_EXCLUDED || []).includes(emp.Jabatan)) {
+        return Utils.toast(`❌ Jabatan "${emp.Jabatan}" tergolong Tidak Dapat Laptop, tidak bisa ditambahkan/diedit.`);
+      }
+    }
+
+    // ✅ BARU: Validasi 1 karyawan tidak boleh punya 2 laptop berstatus "Aktif" di saat bersamaan
+    if (nip && status === 'Aktif') {
+      const dupAktif = AppState.laptop.find(l =>
+        l.id !== editId && String(l.NIP || '').trim() === nip && l.Status === 'Aktif'
+      );
+      if (dupAktif) {
+        return Utils.toast(`❌ ${namaPengguna} sudah memiliki laptop aktif (${dupAktif.NamaPerangkat} · SN: ${dupAktif.SerialNumber}). Ubah status laptop lama terlebih dahulu.`);
+      }
+    }
     const enriched = {
       NIP: nip, NamaPengguna: namaPengguna, SBU: sbu,
       NamaPerangkat: namaPerangkat, PA: pa, SerialNumber: serial, Status: status,
@@ -3711,6 +3762,7 @@ const Handlers = {
       belum: arr.filter(l => l.Status === 'Belum Dikembalikan').length,
       sudah: arr.filter(l => l.Status === 'Sudah Dikembalikan').length,
       belumDapat: arr.filter(l => l.Status === 'Belum Dapat Laptop').length,
+      tidakDapat: arr.filter(l => l.Status === 'Tidak Dapat Laptop').length, // ✅ BARU
       kosong: arr.filter(l => !l.Status).length
     });
 
@@ -3718,7 +3770,8 @@ const Handlers = {
       const c = countBy(combined.filter(l => l.SBU === sbu));
       return {
         'SBU': sbu, 'Total': c.total, 'Aktif': c.aktif, 'Belum Dikembalikan': c.belum,
-        'Sudah Dikembalikan': c.sudah, 'Belum Dapat Laptop': c.belumDapat, 'Belum Diisi Status': c.kosong
+        'Sudah Dikembalikan': c.sudah, 'Belum Dapat Laptop': c.belumDapat,
+        'Tidak Dapat Laptop': c.tidakDapat, 'Belum Diisi Status': c.kosong
       };
     });
 
@@ -3733,7 +3786,8 @@ const Handlers = {
         const c = countBy(byJabatan[jab]);
         jabatanRows.push({
           'SBU': sbu, 'Jabatan': jab, 'Total': c.total, 'Aktif': c.aktif, 'Belum Dikembalikan': c.belum,
-          'Sudah Dikembalikan': c.sudah, 'Belum Dapat Laptop': c.belumDapat, 'Belum Diisi Status': c.kosong
+          'Sudah Dikembalikan': c.sudah, 'Belum Dapat Laptop': c.belumDapat,
+          'Tidak Dapat Laptop': c.tidakDapat, 'Belum Diisi Status': c.kosong
         });
       });
     });
