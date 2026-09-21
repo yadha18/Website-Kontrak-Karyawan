@@ -602,6 +602,18 @@ const Utils = {
     return AppState.karyawan.find(k => k.NIP.replace(/^0+/, '') === stripped) || null;
   },
 
+  // ✅ BARU: Cek apakah 1 baris laptop sudah "bebas" sehingga Serial Number-nya boleh dipakai ulang
+  // oleh karyawan aktif/baru. Syaratnya: pemegang lamanya sudah Resign DAN laptopnya sudah dikembalikan.
+  // Kalau karyawan resign tapi status laptop masih "Belum Dikembalikan"/"Aktif", serial tetap terkunci.
+  isLaptopSerialReleased(row) {
+    if (!row) return false;
+    if (row.Status !== 'Sudah Dikembalikan') return false;
+    const emp = Utils.findKaryawanByNIP(row.NIP);
+    // Kalau NIP-nya sudah tidak ada di Data Karyawan, anggap sudah tidak dipegang siapa pun
+    if (!emp) return true;
+    return emp.Status === 'Resign';
+  },
+
   // ✅ BARU: Nilai yang paling sering dipakai untuk 1 kolom di Data Karyawan (mode) — dipakai untuk
   // otomatis mengisi kolom seperti PJTK / No. SP2K pada karyawan baru, mengikuti data yang sudah ada.
   getMostCommonValue(field) {
@@ -1268,7 +1280,14 @@ const LaptopService = {
   // ✅ BARU: tambahan validasi Serial Number duplikat & Jabatan yang dikecualikan dari pengadaan laptop.
   classifyUploadRows(rows) {
     const seenSerial = new Set(); // deteksi duplikat SN di dalam file yang sama
-    const existingSerial = new Set(AppState.laptop.map(l => String(l.SerialNumber || '').trim().toLowerCase()).filter(Boolean));
+    // ✅ DIUBAH: serial yang pemegang lamanya sudah Resign & laptopnya sudah dikembalikan TIDAK dianggap
+    // terpakai, sehingga boleh dipakai ulang oleh karyawan aktif/baru.
+    const existingSerial = new Set(
+      AppState.laptop
+        .filter(l => !Utils.isLaptopSerialReleased(l))
+        .map(l => String(l.SerialNumber || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
     const excluded = CONFIG.JABATAN_LAPTOP_EXCLUDED || [];
 
     return rows.map(raw => {
@@ -3599,12 +3618,15 @@ const Handlers = {
     const editId = AppState.modals.laptopEditId;
     const existing = (editId !== null && editId !== undefined) ? AppState.laptop.find(l => l.id === editId) : null;
 
-    // ✅ BARU: Validasi Serial Number tidak boleh duplikat dengan data laptop lain
+    // ✅ DIUBAH: Validasi Serial Number duplikat — tapi serial milik karyawan yang sudah Resign DAN
+    // laptopnya sudah dikembalikan boleh dipakai ulang oleh karyawan aktif/baru.
     const dupSerial = AppState.laptop.find(l =>
-      l.id !== editId && String(l.SerialNumber || '').trim().toLowerCase() === serial.toLowerCase()
+      l.id !== editId &&
+      String(l.SerialNumber || '').trim().toLowerCase() === serial.toLowerCase() &&
+      !Utils.isLaptopSerialReleased(l)
     );
     if (dupSerial) {
-      return Utils.toast(`❌ Serial Number "${serial}" sudah dipakai oleh laptop milik ${dupSerial.NamaPengguna || dupSerial.NIP || '(tanpa nama)'}!`);
+      return Utils.toast(`❌ Serial Number "${serial}" masih dipakai oleh ${dupSerial.NamaPengguna || dupSerial.NIP || '(tanpa nama)'} (status: ${dupSerial.Status || 'Belum Diisi'})!`);
     }
 
     // ✅ BARU: Validasi Jabatan yang dikecualikan dari pengadaan laptop (mis. Account Executive Grade 1 & 2)
