@@ -607,10 +607,14 @@ const Utils = {
   // yang sama — itu tetap 1 unit laptop, jadi tidak boleh menambah jumlah. Baris virtual
   // ("Belum/Tidak Dapat Laptop") tidak dihitung karena belum ada unit fisiknya. Baris tanpa Serial Number
   // tidak bisa di-dedup, jadi dihitung satuan lewat id-nya.
+  // ✅ DIUBAH: baris yang pemegangnya sudah Resign DAN laptopnya sudah dikembalikan juga tidak dihitung,
+  // karena unit itu sudah lepas dari karyawan tersebut. Kalau Serial Number yang sama dipakai lagi oleh
+  // karyawan aktif, unit tetap terhitung 1 lewat baris pemakai barunya.
   countUniqueLaptops(rows) {
     const seen = new Set();
     (rows || []).forEach(l => {
       if (l.__virtual) return;
+      if (Utils.isLaptopSerialReleased(l)) return;
       const sn = String(l.SerialNumber || '').trim().toLowerCase();
       seen.add(sn ? 'sn:' + sn : 'id:' + l.id);
     });
