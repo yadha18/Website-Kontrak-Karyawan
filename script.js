@@ -602,6 +602,21 @@ const Utils = {
     return AppState.karyawan.find(k => k.NIP.replace(/^0+/, '') === stripped) || null;
   },
 
+  // ✅ BARU: Hitung jumlah laptop FISIK (unit nyata), bukan jumlah baris pencatatan.
+  // Satu laptop yang sudah dikembalikan lalu dipakai orang lain akan punya >1 baris dengan Serial Number
+  // yang sama — itu tetap 1 unit laptop, jadi tidak boleh menambah jumlah. Baris virtual
+  // ("Belum/Tidak Dapat Laptop") tidak dihitung karena belum ada unit fisiknya. Baris tanpa Serial Number
+  // tidak bisa di-dedup, jadi dihitung satuan lewat id-nya.
+  countUniqueLaptops(rows) {
+    const seen = new Set();
+    (rows || []).forEach(l => {
+      if (l.__virtual) return;
+      const sn = String(l.SerialNumber || '').trim().toLowerCase();
+      seen.add(sn ? 'sn:' + sn : 'id:' + l.id);
+    });
+    return seen.size;
+  },
+
   // ✅ BARU: Cek apakah 1 baris laptop sudah "bebas" sehingga Serial Number-nya boleh dipakai ulang
   // oleh karyawan aktif/baru. Syaratnya: pemegang lamanya sudah Resign DAN laptopnya sudah dikembalikan.
   // Kalau karyawan resign tapi status laptop masih "Belum Dikembalikan"/"Aktif", serial tetap terkunci.
@@ -1939,13 +1954,15 @@ const UI = {
       sudah: arr.filter(l => l.Status === 'Sudah Dikembalikan').length,
       belumDapat: arr.filter(l => l.Status === 'Belum Dapat Laptop').length,
       tidakDapat: arr.filter(l => l.Status === 'Tidak Dapat Laptop').length, // ✅ BARU: Jabatan yang tidak berhak (mis. AE Grade 1 & 2)
-      kosong: arr.filter(l => !l.Status).length
+      kosong: arr.filter(l => !l.Status).length,
+      unit: Utils.countUniqueLaptops(arr) // ✅ BARU: jumlah unit laptop fisik (unik per Serial Number)
     });
 
     const rows = sbuList.map(sbu => ({ sbu, entries: laptop.filter(l => l.SBU === sbu), ...countBy(laptop.filter(l => l.SBU === sbu)) }));
     const totals = countBy(laptop);
-    // ✅ Total laptop fisik (bukan baris virtual "Belum/Tidak Dapat Laptop")
-    const totalLaptopFisik = laptop.filter(l => !l.__virtual).length;
+    // ✅ DIUBAH: Total laptop dihitung per unit FISIK (unik per Serial Number), bukan per baris —
+    // laptop yang sudah dikembalikan lalu dipakai orang lain tetap terhitung 1 unit.
+    const totalLaptopFisik = Utils.countUniqueLaptops(laptop);
 
     const elCard = document.getElementById('laptop-summary-card');
     if (elCard) {
@@ -1970,7 +1987,8 @@ const UI = {
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th></th><th>SBU</th><th>Total</th><th>🟢 Aktif</th><th>🔴 Belum Dikembalikan</th>
+              <th></th><th>SBU</th><th>Total</th><th title="Jumlah unit laptop fisik (unik per Serial Number)">💻 Unit Laptop</th>
+              <th>🟢 Aktif</th><th>🔴 Belum Dikembalikan</th>
               <th>✅ Sudah Dikembalikan</th><th>⛔ Belum Dapat Laptop</th><th>🚫 Tidak Dapat Laptop</th><th>Belum Diisi Status</th>
             </tr></thead>
             ${rows.map(r => {
@@ -2008,6 +2026,7 @@ const UI = {
                       <span class="slot-accordion-arrow ${jabOpen ? 'open' : ''}" style="font-size:9px;margin-right:6px;display:inline-block;">▶</span>↳ ${jab}
                     </td>
                     <td class="mono" style="text-align:center;font-weight:600;">${c.total}</td>
+                    <td class="mono" style="text-align:center;">${c.unit}</td>
                     <td class="mono" style="text-align:center;">${c.aktif}</td>
                     <td class="mono" style="text-align:center;">${c.belum}</td>
                     <td class="mono" style="text-align:center;">${c.sudah}</td>
@@ -2017,7 +2036,7 @@ const UI = {
                   </tr>
                   ${jabOpen ? `
                   <tr class="slot-jabatan-detail-row">
-                    <td colspan="9" style="padding:0;">
+                    <td colspan="10" style="padding:0;">
                       <div class="slot-jabatan-employee-list">${namesList || `<div style="color:var(--text3);font-size:12px;padding:6px 2px;">Tidak ada karyawan.</div>`}</div>
                     </td>
                   </tr>` : ''}`;
@@ -2029,6 +2048,7 @@ const UI = {
                     <td id="${sbuId}_arrow" style="width:22px;text-align:center;color:var(--text2);">${sbuOpen ? '▾' : '▸'}</td>
                     <td style="font-weight:500;">${r.sbu}</td>
                     <td class="mono" style="text-align:center;font-weight:600;">${r.total}</td>
+                    <td class="mono" style="text-align:center;">${r.unit}</td>
                     <td class="mono" style="text-align:center;">${r.aktif}</td>
                     <td class="mono" style="text-align:center;">${r.belum}</td>
                     <td class="mono" style="text-align:center;">${r.sudah}</td>
@@ -2038,7 +2058,7 @@ const UI = {
                   </tr>
                 </tbody>
                 <tbody id="${sbuId}_detail" style="display:${sbuOpen ? '' : 'none'};">
-                  ${jabatanRows || `<tr><td></td><td colspan="8" style="color:var(--text2);font-size:12px;padding:8px 12px;">Tidak ada data di SBU ini</td></tr>`}
+                  ${jabatanRows || `<tr><td></td><td colspan="9" style="color:var(--text2);font-size:12px;padding:8px 12px;">Tidak ada data di SBU ini</td></tr>`}
                 </tbody>`;
             }).join('')}
           </table>
@@ -3789,13 +3809,14 @@ const Handlers = {
       sudah: arr.filter(l => l.Status === 'Sudah Dikembalikan').length,
       belumDapat: arr.filter(l => l.Status === 'Belum Dapat Laptop').length,
       tidakDapat: arr.filter(l => l.Status === 'Tidak Dapat Laptop').length, // ✅ BARU
-      kosong: arr.filter(l => !l.Status).length
+      kosong: arr.filter(l => !l.Status).length,
+      unit: Utils.countUniqueLaptops(arr) // ✅ BARU: unit laptop fisik (unik per Serial Number)
     });
 
     const rows = sbuList.map(sbu => {
       const c = countBy(combined.filter(l => l.SBU === sbu));
       return {
-        'SBU': sbu, 'Total': c.total, 'Aktif': c.aktif, 'Belum Dikembalikan': c.belum,
+        'SBU': sbu, 'Total': c.total, 'Unit Laptop': c.unit, 'Aktif': c.aktif, 'Belum Dikembalikan': c.belum,
         'Sudah Dikembalikan': c.sudah, 'Belum Dapat Laptop': c.belumDapat,
         'Tidak Dapat Laptop': c.tidakDapat, 'Belum Diisi Status': c.kosong
       };
@@ -3811,7 +3832,7 @@ const Handlers = {
       Object.keys(byJabatan).sort().forEach(jab => {
         const c = countBy(byJabatan[jab]);
         jabatanRows.push({
-          'SBU': sbu, 'Jabatan': jab, 'Total': c.total, 'Aktif': c.aktif, 'Belum Dikembalikan': c.belum,
+          'SBU': sbu, 'Jabatan': jab, 'Total': c.total, 'Unit Laptop': c.unit, 'Aktif': c.aktif, 'Belum Dikembalikan': c.belum,
           'Sudah Dikembalikan': c.sudah, 'Belum Dapat Laptop': c.belumDapat,
           'Tidak Dapat Laptop': c.tidakDapat, 'Belum Diisi Status': c.kosong
         });
