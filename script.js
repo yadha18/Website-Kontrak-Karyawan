@@ -605,19 +605,16 @@ const Utils = {
     return AppState.karyawan.find(k => k.NIP.replace(/^0+/, '') === stripped) || null;
   },
 
-  // ✅ BARU: Hitung jumlah laptop FISIK (unit nyata), bukan jumlah baris pencatatan.
+  // ✅ DIUBAH: Hitung jumlah laptop FISIK (unit nyata), bukan jumlah baris pencatatan.
   // Satu laptop yang sudah dikembalikan lalu dipakai orang lain akan punya >1 baris dengan Serial Number
-  // yang sama — itu tetap 1 unit laptop, jadi tidak boleh menambah jumlah. Baris virtual
-  // ("Belum/Tidak Dapat Laptop") tidak dihitung karena belum ada unit fisiknya. Baris tanpa Serial Number
-  // tidak bisa di-dedup, jadi dihitung satuan lewat id-nya.
-  // ✅ DIUBAH: baris yang pemegangnya sudah Resign DAN laptopnya sudah dikembalikan juga tidak dihitung,
-  // karena unit itu sudah lepas dari karyawan tersebut. Kalau Serial Number yang sama dipakai lagi oleh
-  // karyawan aktif, unit tetap terhitung 1 lewat baris pemakai barunya.
+  // yang sama — tetap dihitung 1 unit (dedup by Serial Number). Laptop yang sudah dikembalikan TETAP
+  // dihitung juga (unitnya masih ada, sekalipun pemegangnya sudah Resign dan belum ada penggantinya) —
+  // pengembalian tidak menghilangkan unit itu dari inventaris. Baris virtual ("Belum/Tidak Dapat Laptop")
+  // tidak dihitung karena memang belum ada unit fisiknya. Baris tanpa Serial Number dihitung satuan lewat id.
   countUniqueLaptops(rows) {
     const seen = new Set();
     (rows || []).forEach(l => {
       if (l.__virtual) return;
-      if (Utils.isLaptopSerialReleased(l)) return;
       const sn = String(l.SerialNumber || '').trim().toLowerCase();
       seen.add(sn ? 'sn:' + sn : 'id:' + l.id);
     });
