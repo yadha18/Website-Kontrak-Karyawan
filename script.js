@@ -29,6 +29,8 @@ const CONFIG = {
     'JAWA BAGIAN TENGAH', 'JAWA BAGIAN BARAT', 'JAKARTA & BANTEN',
     'BALI & NUSA TENGGARA', 'PUSAT'
   ],
+  // ✅ BARU: Total Laptop dikunci PERMANEN di angka ini (tidak dihitung otomatis dari data lagi)
+  TOTAL_LAPTOP_LOCKED_VALUE: 138,
   // ✅ BARU: Jabatan yang dikecualikan dari Monitoring Pengadaan Laptop (tidak dihitung sama sekali)
   // ✅ DIUBAH: Jabatan ini bukan lagi "dikecualikan total" dari monitoring — tetap muncul,
   // tapi digolongkan Status "Tidak Dapat Laptop" (lihat Utils.getLaptopRowsWithMissing)
@@ -260,9 +262,6 @@ const AppState = {
   slotJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan, key = "SBU::Jabatan"
   laptopJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan di Dashboard Laptop, key = "SBU::Jabatan"
   laptopSBUPanelOpen: {}, // ✅ BARU: state buka/tutup breakdown per SBU di Dashboard Laptop, key = nama SBU
-  // ✅ BARU: Kunci angka "Total Laptop" di Dashboard supaya tidak ikut berubah otomatis lagi
-  // (mis. saat ada data laptop baru/diedit/dihapus). { locked: true/false, value: <angka saat dikunci> }
-  laptopTotalLock: { locked: false, value: null },
 
   // ✅ BARU: State autentikasi superadmin (khusus sesi ini, reset saat reload halaman)
   superadminAuthed: false,
@@ -836,10 +835,6 @@ const DB = {
 
       // ✅ BARU: Monitoring Pengadaan Laptop
       AppState.laptop = (Array.isArray(data.laptop) ? data.laptop : []).map(l => Models.Laptop(l));
-      // ✅ BARU: Kunci "Total Laptop" (kalau pernah dikunci sebelumnya)
-      AppState.laptopTotalLock = (data.laptopTotalLock && typeof data.laptopTotalLock === 'object')
-        ? { locked: !!data.laptopTotalLock.locked, value: Number(data.laptopTotalLock.value) || 0 }
-        : { locked: false, value: null };
       // Re-sync Nama Pengguna/Regional yang kosong — untuk data lama yang gagal ke-lookup saat upload
       AppState.laptop.forEach(l => {
         if (!l.SBU || !l.NamaPengguna) {
@@ -867,7 +862,6 @@ const DB = {
       AppState.lemburSbuConfig = AppState.lemburSbuConfig || {};
       AppState.tiketHPI = Number(AppState.tiketHPI) || 0;
       AppState.laptop = AppState.laptop || [];
-      AppState.laptopTotalLock = AppState.laptopTotalLock || { locked: false, value: null };
       return false;
     }
   },
@@ -892,8 +886,7 @@ const DB = {
           lemburSbuConfig: AppState.lemburSbuConfig,
           tiketHPI: AppState.tiketHPI,
           laptop: AppState.laptop,
-          subBidang: AppState.subBidang,
-          laptopTotalLock: AppState.laptopTotalLock // ✅ BARU
+          subBidang: AppState.subBidang
         })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -2000,12 +1993,9 @@ const UI = {
 
     const rows = sbuList.map(sbu => ({ sbu, entries: laptop.filter(l => l.SBU === sbu), ...countBy(laptop.filter(l => l.SBU === sbu)) }));
     const totals = countBy(laptop);
-    // ✅ DIUBAH: Total laptop dihitung per unit FISIK (unik per Serial Number), bukan per baris —
-    // laptop yang sudah dikembalikan lalu dipakai orang lain tetap terhitung 1 unit.
-    // Kalau sudah dikunci (laptopTotalLock.locked), pakai angka yang dikunci, bukan hasil hitung ulang.
-    const totalLaptopHidup = Utils.countUniqueLaptops(laptop);
-    const lock = AppState.laptopTotalLock || { locked: false, value: null };
-    const totalLaptopFisik = lock.locked ? lock.value : totalLaptopHidup;
+    // ✅ DIUBAH: Total Laptop dikunci PERMANEN di angka 138 (lihat CONFIG.TOTAL_LAPTOP_LOCKED_VALUE) —
+    // tidak lagi dihitung otomatis dari data, dan tidak ada tombol toggle lock/unlock.
+    const totalLaptopFisik = CONFIG.TOTAL_LAPTOP_LOCKED_VALUE;
 
     const elCard = document.getElementById('laptop-summary-card');
     if (elCard) {
@@ -2018,7 +2008,7 @@ const UI = {
           <div class="stat-card">
             <div class="stat-label" style="display:flex;align-items:center;gap:6px;">
               Total Laptop
-              <span style="cursor:pointer;font-size:12px;" title="${lock.locked ? `Terkunci di angka ${lock.value}. Klik untuk membuka kunci & hitung ulang otomatis.` : 'Klik untuk mengunci angka ini supaya tidak berubah otomatis.'}" onclick="Handlers.toggleLaptopTotalLock()">${lock.locked ? '🔒' : '🔓'}</span>
+              <span style="font-size:12px;" title="Angka ini dikunci permanen, tidak dihitung otomatis dari data.">🔒</span>
             </div>
             <div class="stat-value accent">${totalLaptopFisik}</div>
           </div>
@@ -3201,23 +3191,6 @@ const Handlers = {
   toggleLaptopJabatanPanel(jabKey) {
     AppState.laptopJabatanPanelOpen[jabKey] = !AppState.laptopJabatanPanelOpen[jabKey];
     UI.renderDashboardLaptop();
-  },
-
-  // ✅ BARU: Kunci/buka-kunci angka "Total Laptop" di Dashboard Laptop.
-  // Saat dikunci: angka dibekukan di nilai saat ini (tidak ikut berubah walau data laptop berubah).
-  // Saat dibuka lagi: kembali dihitung otomatis (live) seperti biasa.
-  toggleLaptopTotalLock() {
-    const lock = AppState.laptopTotalLock || { locked: false, value: null };
-    if (lock.locked) {
-      AppState.laptopTotalLock = { locked: false, value: null };
-      Utils.toast('🔓 Total Laptop kembali dihitung otomatis');
-    } else {
-      const current = Utils.countUniqueLaptops(Utils.getLaptopRowsWithMissing());
-      AppState.laptopTotalLock = { locked: true, value: current };
-      Utils.toast(`🔒 Total Laptop dikunci di angka ${current}`);
-    }
-    UI.renderDashboardLaptop();
-    DB.save();
   },
 
   // ✅ BARU: Isi otomatis Gaji Pokok & Harga Satuan di form Data Karyawan berdasarkan kombinasi
