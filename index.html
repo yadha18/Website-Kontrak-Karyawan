@@ -87,11 +87,11 @@
     <div class="nav-label">Monitoring Pengadaan Laptop</div>
     <button class="nav-item" onclick="navigate('dashboard-laptop')"><span class="icon">💻</span> Dashboard Laptop</button>
     <button class="nav-item" onclick="navigate('laptop')"><span class="icon">🧾</span> Tabel Monitoring Laptop</button>
-    
+    <button class="nav-item" onclick="navigate('sbu-grade')"><span class="icon">📐</span> Kombinasi SBU & Grade</button>
+
     <!-- <button class="nav-item" onclick="navigate('pindah')"><span class="icon">🔄</span> Pindah Jabatan</button> -->
     <div class="nav-label">Pengaturan</div>
     <button class="nav-item" onclick="navigate('jabatan')"><span class="icon">📋</span> Daftar Jabatan</button>
-    <button class="nav-item" onclick="navigate('sbu-grade')"><span class="icon">📐</span> Kombinasi SBU & Grade</button>
   </nav>
 
   <main class="content">
@@ -557,7 +557,7 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Grade</label>
-        <select class="form-control" id="editGrade"><option value="">Pilih Grade</option></select>
+        <select class="form-control" id="editGrade" onchange="Handlers.syncHargaFromGradeSBU()"><option value="">Pilih Grade</option></select>
       </div>
     </div>
 
@@ -568,19 +568,20 @@
       </div>
       <div class="form-group">
         <label class="form-label">SBU</label>
-        <select class="form-control" id="editSBU"></select>
+        <select class="form-control" id="editSBU" onchange="Handlers.syncHargaFromGradeSBU()"></select>
       </div>
     </div>
 
-    <!-- ✅ BARU: Gaji Pokok, Harga Satuan, PJTK, No. SP2K, Nama TL, Sub Bidang (ditempatkan setelah SBU) -->
+    <!-- ✅ DIUBAH: Gaji Pokok & Harga Satuan kini mengikuti otomatis daftar Kombinasi SBU & Grade —
+         tidak bisa diketik manual, hanya berubah kalau Grade/SBU-nya diganti. -->
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Gaji Pokok</label>
-        <input type="number" min="0" class="form-control" id="editGajiPokok" placeholder="cth: 5000000">
+        <label class="form-label">Gaji Pokok <span style="color:var(--text2);font-weight:400;">(otomatis dari SBU &amp; Grade)</span></label>
+        <input type="number" min="0" class="form-control" id="editGajiPokok" placeholder="Pilih Grade &amp; SBU dahulu" readonly style="background:var(--surface2);cursor:not-allowed;">
       </div>
       <div class="form-group">
-        <label class="form-label">Harga Satuan</label>
-        <input type="number" min="0" class="form-control" id="editHargaSatuan" placeholder="cth: 150000">
+        <label class="form-label">Harga Satuan <span style="color:var(--text2);font-weight:400;">(otomatis dari SBU &amp; Grade)</span></label>
+        <input type="number" min="0" class="form-control" id="editHargaSatuan" placeholder="Pilih Grade &amp; SBU dahulu" readonly style="background:var(--surface2);cursor:not-allowed;">
       </div>
     </div>
     <div class="form-row">

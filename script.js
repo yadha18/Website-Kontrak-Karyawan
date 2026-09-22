@@ -260,6 +260,9 @@ const AppState = {
   slotJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan, key = "SBU::Jabatan"
   laptopJabatanPanelOpen: {}, // ✅ BARU: state buka/tutup dropdown nama karyawan per Jabatan di Dashboard Laptop, key = "SBU::Jabatan"
   laptopSBUPanelOpen: {}, // ✅ BARU: state buka/tutup breakdown per SBU di Dashboard Laptop, key = nama SBU
+  // ✅ BARU: Kunci angka "Total Laptop" di Dashboard supaya tidak ikut berubah otomatis lagi
+  // (mis. saat ada data laptop baru/diedit/dihapus). { locked: true/false, value: <angka saat dikunci> }
+  laptopTotalLock: { locked: false, value: null },
 
   // ✅ BARU: State autentikasi superadmin (khusus sesi ini, reset saat reload halaman)
   superadminAuthed: false,
@@ -764,6 +767,31 @@ const Utils = {
     const jab = String(jabatanText || '').toUpperCase();
     const findByKeyword = (text) => candidates.find(c => text.includes(c.split(' GRADE-')[0]));
     return findByKeyword(raw) || findByKeyword(jab) || null;
+  },
+
+  // ✅ BARU: Cari Harga Satuan & Gaji Pokok default untuk 1 kombinasi SBU + Grade,
+  // berdasarkan daftar referensi CONFIG.HARGA_SBU_GRADE (dari Harga_Fix_Jabatan_dan_SBU.xlsx).
+  findHargaSbuGrade(sbu, grade) {
+    if (!sbu || !grade) return null;
+    return CONFIG.HARGA_SBU_GRADE.find(h => h.SBU === sbu && h.Grade === grade) || null;
+  },
+
+  // ✅ BARU: Sesuaikan Gaji Pokok & Harga Satuan SEMUA karyawan ke harga default sesuai kombinasi
+  // SBU + Grade mereka saat ini (menimpa nilai lama, termasuk yang pernah diisi manual). Karyawan yang
+  // kombinasi SBU+Grade-nya tidak ada di daftar referensi TIDAK disentuh (dibiarkan apa adanya).
+  // Dipanggil otomatis setiap kali data selesai dimuat dari server (lihat DB.load()).
+  syncAllKaryawanHarga() {
+    let changed = 0;
+    (AppState.karyawan || []).forEach(k => {
+      const harga = Utils.findHargaSbuGrade(k.SBU, k.Grade);
+      if (!harga) return; // kombinasi tidak ditemukan di daftar referensi → biarkan
+      if (k.HargaSatuan !== harga.HargaSatuan || k.GajiPokok !== harga.GajiPokok) {
+        k.HargaSatuan = harga.HargaSatuan;
+        k.GajiPokok = harga.GajiPokok;
+        changed++;
+      }
+    });
+    return changed;
   }
 };
 
@@ -811,6 +839,10 @@ const DB = {
 
       // ✅ BARU: Monitoring Pengadaan Laptop
       AppState.laptop = (Array.isArray(data.laptop) ? data.laptop : []).map(l => Models.Laptop(l));
+      // ✅ BARU: Kunci "Total Laptop" (kalau pernah dikunci sebelumnya)
+      AppState.laptopTotalLock = (data.laptopTotalLock && typeof data.laptopTotalLock === 'object')
+        ? { locked: !!data.laptopTotalLock.locked, value: Number(data.laptopTotalLock.value) || 0 }
+        : { locked: false, value: null };
       // Re-sync Nama Pengguna/Regional yang kosong — untuk data lama yang gagal ke-lookup saat upload
       AppState.laptop.forEach(l => {
         if (!l.SBU || !l.NamaPengguna) {
@@ -818,6 +850,11 @@ const DB = {
           if (emp) { l.NamaPengguna = emp.Nama; l.SBU = emp.SBU; }
         }
       });
+
+      // ✅ BARU: Sesuaikan otomatis Gaji Pokok & Harga Satuan semua karyawan ke harga default
+      // sesuai kombinasi SBU + Grade (dari daftar referensi Kombinasi SBU & Grade), setiap kali data dimuat.
+      // Kalau ada yang berubah, simpan kembali ke server supaya database juga ikut konsisten.
+      if (Utils.syncAllKaryawanHarga() > 0) this.save();
 
       return true;
     } catch (err) {
@@ -833,6 +870,7 @@ const DB = {
       AppState.lemburSbuConfig = AppState.lemburSbuConfig || {};
       AppState.tiketHPI = Number(AppState.tiketHPI) || 0;
       AppState.laptop = AppState.laptop || [];
+      AppState.laptopTotalLock = AppState.laptopTotalLock || { locked: false, value: null };
       return false;
     }
   },
@@ -857,7 +895,8 @@ const DB = {
           lemburSbuConfig: AppState.lemburSbuConfig,
           tiketHPI: AppState.tiketHPI,
           laptop: AppState.laptop,
-          subBidang: AppState.subBidang
+          subBidang: AppState.subBidang,
+          laptopTotalLock: AppState.laptopTotalLock // ✅ BARU
         })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1966,7 +2005,10 @@ const UI = {
     const totals = countBy(laptop);
     // ✅ DIUBAH: Total laptop dihitung per unit FISIK (unik per Serial Number), bukan per baris —
     // laptop yang sudah dikembalikan lalu dipakai orang lain tetap terhitung 1 unit.
-    const totalLaptopFisik = Utils.countUniqueLaptops(laptop);
+    // Kalau sudah dikunci (laptopTotalLock.locked), pakai angka yang dikunci, bukan hasil hitung ulang.
+    const totalLaptopHidup = Utils.countUniqueLaptops(laptop);
+    const lock = AppState.laptopTotalLock || { locked: false, value: null };
+    const totalLaptopFisik = lock.locked ? lock.value : totalLaptopHidup;
 
     const elCard = document.getElementById('laptop-summary-card');
     if (elCard) {
@@ -1976,7 +2018,13 @@ const UI = {
           <button class="btn btn-success btn-sm" onclick="Handlers.exportDashboardLaptopExcel()">⬇ Export Excel</button>
         </div>
         <div class="stat-grid" style="grid-template-columns:repeat(6,1fr);">
-          <div class="stat-card"><div class="stat-label">Total Laptop</div><div class="stat-value accent">${totalLaptopFisik}</div></div>
+          <div class="stat-card">
+            <div class="stat-label" style="display:flex;align-items:center;gap:6px;">
+              Total Laptop
+              <span style="cursor:pointer;font-size:12px;" title="${lock.locked ? `Terkunci di angka ${lock.value}. Klik untuk membuka kunci & hitung ulang otomatis.` : 'Klik untuk mengunci angka ini supaya tidak berubah otomatis.'}" onclick="Handlers.toggleLaptopTotalLock()">${lock.locked ? '🔒' : '🔓'}</span>
+            </div>
+            <div class="stat-value accent">${totalLaptopFisik}</div>
+          </div>
           <div class="stat-card"><div class="stat-label">🟢 Aktif</div><div class="stat-value success">${totals.aktif}</div></div>
           <div class="stat-card"><div class="stat-label">🔴 Belum Dikembalikan</div><div class="stat-value danger">${totals.belum}</div></div>
           <div class="stat-card"><div class="stat-label">✅ Sudah Dikembalikan</div><div class="stat-value warning">${totals.sudah}</div></div>
@@ -2681,6 +2729,7 @@ const Handlers = {
     }));
     // ✅ DIUBAH: bulkUpload kini mengembalikan statistik (NIP sebagai Primary Key)
     const stats = EmployeeService.bulkUpload(mapped);
+    Utils.syncAllKaryawanHarga(); // ✅ BARU: pastikan Gaji Pokok/Harga Satuan ikut konsisten setelah upload
     this.cancelUpload();
 
     // ✅ DIUBAH: duplicateExisting sekarang tidak lagi "dilewati" — kolom kosongnya dilengkapi (lihat filledCount)
@@ -2867,6 +2916,7 @@ const Handlers = {
     document.getElementById('editSBU').value          = emp.SBU;
     document.getElementById('editGajiPokok').value    = emp.GajiPokok || '';                   // ✅ BARU
     document.getElementById('editHargaSatuan').value  = emp.HargaSatuan || '';                 // ✅ BARU
+    Handlers.syncHargaFromGradeSBU(); // ✅ BARU: pastikan Gaji Pokok/Harga Satuan sesuai Grade+SBU saat modal dibuka
     document.getElementById('editPJTK').value         = emp.PJTK || (id ? '' : (Utils.getMostCommonValue('PJTK') || CONFIG.DEFAULT_PJTK));       // ✅ DIUBAH: fallback ke default
     document.getElementById('editNoSP2K').value       = emp.NoSP2K || (id ? '' : (Utils.getMostCommonValue('NoSP2K') || CONFIG.DEFAULT_NO_SP2K)); // ✅ DIUBAH: fallback ke default
     document.getElementById('editNamaTL').value       = emp.NamaTL || '';                      // ✅ BARU
@@ -2908,14 +2958,20 @@ const Handlers = {
     // Kalau BKO Jabatan dikosongkan, Jabatan tetap mengikuti pilihan di dropdown Jabatan seperti biasa.
     const JabatanValue = BKOJabatanValue || document.getElementById('editJabatan').value;
 
+    const GradeValue = document.getElementById('editGrade').value;
+    const SBUValue = document.getElementById('editSBU').value;
+    // ✅ BARU: Gaji Pokok & Harga Satuan SELALU dihitung ulang dari kombinasi SBU+Grade saat disimpan
+    // (bukan dipercaya dari nilai input apa adanya) — memastikan tidak bisa ditimpa manual dengan cara apa pun.
+    const hargaFinal = Utils.findHargaSbuGrade(SBUValue, GradeValue);
+
     const formData = {
       NIP, Nama,
       NIK:           document.getElementById('editNIK').value,               // ✅ BARU
-      Grade:         document.getElementById('editGrade').value,             // ✅ BARU
+      Grade:         GradeValue,                                             // ✅ BARU
       Jabatan:       JabatanValue,
-      SBU:           document.getElementById('editSBU').value,
-      GajiPokok:     document.getElementById('editGajiPokok').value,          // ✅ BARU
-      HargaSatuan:   document.getElementById('editHargaSatuan').value,        // ✅ BARU
+      SBU:           SBUValue,
+      GajiPokok:     hargaFinal ? hargaFinal.GajiPokok : '',                  // ✅ DIUBAH
+      HargaSatuan:   hargaFinal ? hargaFinal.HargaSatuan : '',                // ✅ DIUBAH
       PJTK:          document.getElementById('editPJTK').value,               // ✅ BARU
       NoSP2K:        document.getElementById('editNoSP2K').value,             // ✅ BARU
       NamaTL:        document.getElementById('editNamaTL').value,             // ✅ BARU
@@ -3148,6 +3204,43 @@ const Handlers = {
   toggleLaptopJabatanPanel(jabKey) {
     AppState.laptopJabatanPanelOpen[jabKey] = !AppState.laptopJabatanPanelOpen[jabKey];
     UI.renderDashboardLaptop();
+  },
+
+  // ✅ BARU: Kunci/buka-kunci angka "Total Laptop" di Dashboard Laptop.
+  // Saat dikunci: angka dibekukan di nilai saat ini (tidak ikut berubah walau data laptop berubah).
+  // Saat dibuka lagi: kembali dihitung otomatis (live) seperti biasa.
+  toggleLaptopTotalLock() {
+    const lock = AppState.laptopTotalLock || { locked: false, value: null };
+    if (lock.locked) {
+      AppState.laptopTotalLock = { locked: false, value: null };
+      Utils.toast('🔓 Total Laptop kembali dihitung otomatis');
+    } else {
+      const current = Utils.countUniqueLaptops(Utils.getLaptopRowsWithMissing());
+      AppState.laptopTotalLock = { locked: true, value: current };
+      Utils.toast(`🔒 Total Laptop dikunci di angka ${current}`);
+    }
+    UI.renderDashboardLaptop();
+    DB.save();
+  },
+
+  // ✅ BARU: Isi otomatis Gaji Pokok & Harga Satuan di form Data Karyawan berdasarkan kombinasi
+  // Grade + SBU yang sedang dipilih (dicocokkan ke CONFIG.HARGA_SBU_GRADE). Dipanggil saat modal
+  // edit dibuka, dan tiap kali dropdown Grade atau SBU diganti. Field tetap readonly di HTML.
+  syncHargaFromGradeSBU() {
+    const grade = document.getElementById('editGrade')?.value || '';
+    const sbu = document.getElementById('editSBU')?.value || '';
+    const elGaji = document.getElementById('editGajiPokok');
+    const elHarga = document.getElementById('editHargaSatuan');
+    if (!elGaji || !elHarga) return;
+    const harga = Utils.findHargaSbuGrade(sbu, grade);
+    if (harga) {
+      elGaji.value = harga.GajiPokok;
+      elHarga.value = harga.HargaSatuan;
+    } else {
+      // Kombinasi belum lengkap/tidak ada di daftar referensi → kosongkan supaya tidak menyimpan angka yang salah
+      elGaji.value = '';
+      elHarga.value = '';
+    }
   },
 
   // ✅ BARU: Minta autentikasi superadmin sebelum mengedit slot suatu SBU
