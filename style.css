@@ -390,8 +390,10 @@ select.form-control { cursor: pointer; }
 @media (max-width: 1024px) {
   .sidebar { width: 190px; }
   .content { padding: 20px; }
-  .stat-grid,
-  .stat-grid.cols-2, .stat-grid.cols-3, .stat-grid.cols-4, .stat-grid.cols-5 { grid-template-columns: repeat(3, 1fr); }
+  /* ✅ !important: beberapa stat-grid diberi grid-template-columns lewat inline style oleh JS
+     (mis. ringkasan Dashboard Laptop repeat(6,1fr)) — inline style selalu menang atas CSS biasa,
+     jadi breakpoint ini butuh !important supaya tetap menyusut di tablet/HP. */
+  .stat-grid { grid-template-columns: repeat(3, 1fr) !important; }
   .modal { width: 92vw; }
   .detail-info-grid { grid-template-columns: 1fr 1fr; gap: 10px 14px; }
 }
@@ -423,8 +425,7 @@ select.form-control { cursor: pointer; }
 
   .page-header h1 { font-size: 19px; }
 
-  .stat-grid,
-  .stat-grid.cols-2, .stat-grid.cols-3, .stat-grid.cols-4, .stat-grid.cols-5 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
   .stat-card { padding: 12px 14px; }
   .stat-value { font-size: 21px; }
 
@@ -452,8 +453,7 @@ select.form-control { cursor: pointer; }
 
 /* ── SMARTPHONE KECIL (≤480px) ── */
 @media (max-width: 480px) {
-  .stat-grid,
-  .stat-grid.cols-2, .stat-grid.cols-3, .stat-grid.cols-4, .stat-grid.cols-5 { grid-template-columns: repeat(1, 1fr); gap: 8px; }
+  .stat-grid { grid-template-columns: repeat(1, 1fr) !important; gap: 8px; }
   .stat-value { font-size: 18px; }
   .stat-label { font-size: 10px; }
   .btn { padding: 7px 12px; font-size: 12.5px; }

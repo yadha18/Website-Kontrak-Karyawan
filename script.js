@@ -2362,6 +2362,13 @@ const Handlers = {
     };
     if (renders[page]) UI[renders[page]]();
     if (page === 'upload') this.setUploadType(AppState.uploadDataType || 'karyawan'); // ✅ BARU
+    this.closeSidebarOnMobile(); // ✅ BARU: tutup drawer menu otomatis di HP/tablet setelah pilih halaman
+  },
+
+  // ✅ BARU: Tutup sidebar (drawer mobile) otomatis setelah navigasi, supaya tidak menutupi konten
+  // di layar sempit. Tidak berefek di desktop karena sidebar tidak pernah dapat class "open" di sana.
+  closeSidebarOnMobile() {
+    if (typeof window.toggleSidebar === 'function') window.toggleSidebar(false);
   },
   resetPageAndRender() { AppState.pagination.page = 1; UI.renderKaryawanTable(); },
   changePageSize() { AppState.pagination.size = parseInt(document.getElementById('pageSize').value); this.resetPageAndRender(); },
@@ -2404,6 +2411,7 @@ const Handlers = {
     });
     document.getElementById('lemburBulanTitle').textContent = `📅 Data Lembur & SPPD — ${bulan}`;
     this.setLemburViewTab(AppState.lemburViewTab || 'dashboard');
+    this.closeSidebarOnMobile(); // ✅ BARU
   },
 
   // ✅ BARU: Ganti tab dalam halaman bulan Lembur & SPPD — 'dashboard' (Dashboard Non PO) atau 'tabel' (Tabel Data)
@@ -4046,6 +4054,16 @@ const Handlers = {
 
 // ─── 9. GLOBAL BINDINGS (Bridges to HTML) ───────────────────────────────────
 window.navigate         = (page) => Handlers.navigate(page);
+// ✅ BARU: Buka/tutup sidebar (drawer menu) di layar HP/tablet — dipanggil oleh tombol hamburger &
+// backdrop gelap di index.html. Tanpa argumen = toggle; pass true/false untuk paksa buka/tutup.
+window.toggleSidebar = function(force) {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+  const open = typeof force === 'boolean' ? force : !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', open);
+  if (backdrop) backdrop.classList.toggle('open', open);
+};
 window.handleFile       = (e)    => Handlers.handleFile(e);
 window.batalUpload      = ()     => Handlers.cancelUpload();
 window.confirmUpload    = ()     => Handlers.confirmUpload();
